@@ -15,4 +15,4 @@
 - **setup**: 프로젝트 초기 설정 자동화
 - **references/**: 외부 규격 참조 기능
 - **coder 배치 병렬화**: 독립적 구현 단계 병렬 처리
-- **Google Chat 알림**: PR 생성 시 Chat Space 자동 알림
+- **Slack 알림**: PR 생성 시 Slack 채널 자동 알림

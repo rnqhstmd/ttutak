@@ -93,43 +93,43 @@ gh auth login --hostname github.com --git-protocol https --web 2>&1
 
 이미 있으면 건너뛴다.
 
-### 4단계: Google Chat 알림 연동 (선택)
+### 4단계: Slack 알림 연동 (선택)
 
-1. `.claude/config.json`의 `notifications.googleChat` 확인:
+1. `.claude/config.json`의 `notifications.slack` 확인:
    - `webhookUrl`이 이미 채워져 있으면 →
-     `Google Chat 연동 : 완료 ✅ (기존 설정 사용)` 출력. 건너뜀.
+     `Slack 연동 : 완료 ✅ (기존 설정 사용)` 출력. 건너뜀.
    - `webhookUrl`이 비어있으면 → 2번으로.
 
-2. AskUserQuestion: "Google Chat 웹훅 알림을 연동하시겠습니까? (PR 생성 시 Chat Space에 알림)"
+2. AskUserQuestion: "Slack 웹훅 알림을 연동하시겠습니까? (PR 생성 시 채널에 알림)"
    - 아니오 → 건너뜀
    - 예 → 3번으로
 
 3. 웹훅 URL 생성 가이드를 표시한 후 AskUserQuestion으로 URL을 받는다:
 
    ```
-   📋 Google Chat 웹훅 URL 생성 방법
+   📋 Slack Incoming Webhook URL 생성 방법
 
-   1. Google Chat에서 알림을 받을 스페이스를 엽니다.
-      (스페이스가 없으면 '+ 새 스페이스'로 먼저 생성하세요)
-   2. 스페이스 상단의 스페이스 이름을 클릭합니다.
-   3. '앱 및 통합' 탭을 선택합니다.
-   4. '+ 웹훅 추가'를 클릭합니다.
-   5. 웹훅 이름(예: 'Claude Code')을 입력하고 '저장'을 누릅니다.
-   6. 생성된 웹훅 URL을 복사합니다.
+   1. https://api.slack.com/apps 에서 'Create New App' → 'From scratch'를 선택합니다.
+   2. App 이름(예: 'ttutak')과 워크스페이스를 선택하고 'Create App'을 누릅니다.
+   3. 왼쪽 메뉴에서 'Incoming Webhooks'를 클릭합니다.
+   4. 'Activate Incoming Webhooks'를 On으로 켭니다.
+   5. 하단의 'Add New Webhook to Workspace'를 클릭합니다.
+   6. 알림을 받을 채널을 선택하고 'Allow'를 누릅니다.
+   7. 생성된 Webhook URL을 복사합니다.
    ```
 
    AskUserQuestion:
    ```
-   question: "위 방법으로 생성한 Google Chat 웹훅 URL을 입력해주세요."
+   question: "위 방법으로 생성한 Slack Webhook URL을 입력해주세요."
    options:
      - { label: "건너뛰기", description: "나중에 설정합니다" }
    ```
 
    - 건너뛰기 → 건너뜀
-   - URL 입력 → `https://chat.googleapis.com/` 시작 여부 검증
+   - URL 입력 → `https://hooks.slack.com/` 시작 여부 검증
    - 유효하지 않으면 1회 재입력 요청. 재입력도 유효하지 않으면 건너뜀.
    - 유효하면 → config.json 갱신 (`enabled: true`, `webhookUrl: URL`)
-     `Google Chat 연동 : 완료 ✅` 출력
+     `Slack 연동 : 완료 ✅` 출력
 
 ### 완료: 퀵스타트
 

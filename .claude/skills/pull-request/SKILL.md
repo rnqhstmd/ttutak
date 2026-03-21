@@ -156,9 +156,9 @@ git diff <base-branch>...HEAD --stat
 
 PR이 성공적으로 생성되었으면:
 
-1. `.claude/config.json`의 `notifications.googleChat` 확인
+1. `.claude/config.json`의 `notifications.slack` 확인
    - `enabled`가 `false`이거나 `webhookUrl`이 비어있으면:
-     "Google Chat 알림이 설정되어 있지 않습니다. `/setup`을 실행하면 웹훅을 연동할 수 있습니다." 안내 후 건너뜀
+     "Slack 알림이 설정되어 있지 않습니다. `/setup`을 실행하면 웹훅을 연동할 수 있습니다." 안내 후 건너뜀
 
 2. 전송 (`timeout: 10000`):
 
