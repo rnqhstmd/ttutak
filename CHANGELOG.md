@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.1 (2026-03-21) — 스킬 호출 안정성 개선
+
+### Fixes
+- **dev phase-complete**: `Read()` 기반 스킬 실행을 `Skill` 도구 호출로 변경하여 allowed-tools 제한이 시스템 레벨에서 강제되도록 수정
+- **스킬 교차 참조**: 모든 스킬 간 참조에 `ttutak:` prefix 적용하여 다른 플러그인과의 이름 충돌 방지
+- **pull-request**: dev 파이프라인 컨텍스트 연동을 `.dev/pr-context.md` 파일 기반으로 재설계
+
+### Enhancements
+- **자연어 스킬 라우팅**: dev, context, lens 스킬의 자연어 트리거 추가
+
 ## v1.0.0 (2026-03-21) — 첫 정식 릴리즈
 
 첫 정식 릴리즈. 8개 스킬 + 9개 에이전트 팀 기반 개발 자동화 플러그인.
