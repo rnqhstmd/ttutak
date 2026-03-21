@@ -1,6 +1,6 @@
 <div align="center">
 
-# ttutak
+# ttutak 뚝딱
 
 **PRD, 설계, 구현, 리뷰, PR까지 처리하는 개발 자동화 플러그인**
 
