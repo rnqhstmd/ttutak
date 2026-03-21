@@ -438,6 +438,7 @@
     <a href="#lens-skill">lens</a>
     <a href="#research-skill">research</a>
     <a href="#humanizer-skill">humanizer</a>
+    <a href="#test-skill">test</a>
     <a href="#commit-pr">commit / PR</a>
   </div>
 </nav>
@@ -535,6 +536,12 @@
           <td>audit, rewrite</td>
         </tr>
         <tr>
+          <td><a href="#test-skill"><strong>test</strong></a></td>
+          <td>도메인별 단위/통합/E2E 테스트 자동 작성</td>
+          <td>coder</td>
+          <td>--type, --coverage</td>
+        </tr>
+        <tr>
           <td><a href="#commit-pr"><strong>commit</strong></a></td>
           <td>브랜치 타입 파싱 + 한국어 커밋</td>
           <td>오케스트레이터 직접</td>
@@ -628,6 +635,8 @@
       <div class="pipeline-step"><div class="step-name">Implement</div><div class="step-agent">구현 + 자기점검</div></div>
       <div class="pipeline-arrow">&rarr;</div>
       <div class="pipeline-step"><div class="step-name">Review</div><div class="step-agent">QA + 보안 감사</div></div>
+      <div class="pipeline-arrow">&rarr;</div>
+      <div class="pipeline-step"><div class="step-name">Test</div><div class="step-agent">테스트 작성</div></div>
       <div class="pipeline-arrow">&rarr;</div>
       <div class="pipeline-step"><div class="step-name">Complete</div><div class="step-agent">커밋 / PR</div></div>
     </div>
@@ -1088,6 +1097,40 @@ references/
         <tr><td>정보 밀도</td><td>수식어가 내용보다 많음</td><td>2문장에 기능·구조·대상 스택 모두 포함</td></tr>
       </tbody>
     </table>
+  </section>
+
+  <!-- Test -->
+  <section id="test-skill">
+    <h2>test — 테스트 자동 작성</h2>
+
+    <p>도메인별로 단위/통합/E2E 테스트를 자동 작성합니다. 기존 테스트의 구조와 코딩 스타일을 분석하여 동일한 패턴으로 생성하며, 커버리지 목표를 검증합니다.</p>
+
+    <h3>사용 예시</h3>
+    <pre><code>"테스트 작성해줘"                              ← 변경 코드 기반 자동 감지
+"appointment 도메인 테스트 추가해줘"             ← 특정 도메인 지정
+"단위 테스트만 작성해줘 --type unit"             ← 유형 선택
+"커버리지 90% 목표로 테스트해줘 --coverage 90"   ← 커버리지 목표</code></pre>
+
+    <h3>테스트 유형별 생성 위치</h3>
+    <table>
+      <thead><tr><th>유형</th><th>위치 패턴</th><th>검증 대상</th></tr></thead>
+      <tbody>
+        <tr><td><strong>단위</strong></td><td><code>domain/{도메인}/{Entity}Test</code></td><td>엔티티, VO, 도메인 서비스</td></tr>
+        <tr><td><strong>통합</strong></td><td><code>domain/{도메인}/{Service}IntegrationTest</code></td><td>서비스 계층, 리포지토리, 캐시</td></tr>
+        <tr><td><strong>E2E</strong></td><td><code>interfaces.api/{도메인}/{Controller}E2ETest</code></td><td>API 엔드포인트, 인증/인가</td></tr>
+      </tbody>
+    </table>
+
+    <h3>실행 흐름</h3>
+    <ol class="flow">
+      <li><span class="flow-title">환경 감지</span> — 프로젝트 타입, 테스트 프레임워크, 기존 테스트 구조/스타일 분석</li>
+      <li><span class="flow-title">대상 도메인 결정</span> — dev 컨텍스트(PRD/AC) 또는 변경 파일 기반 자동 감지</li>
+      <li><span class="flow-title">테스트 계획 수립</span> — 기존 커버리지 분석 → 누락 테스트 도출 → 사용자 승인</li>
+      <li><span class="flow-title">테스트 작성</span> — 단위 → 통합 → E2E 순서로 coder 에이전트가 작성</li>
+      <li><span class="flow-title">실행 및 검증</span> — 테스트 실행 + 실패 시 자동 수정(1회) + 커버리지 확인</li>
+    </ol>
+
+    <blockquote>dev 파이프라인에서는 커밋 전에 자동 호출됩니다. hotfix 모드에서는 건너뜁니다.</blockquote>
   </section>
 
   <!-- Commit / PR -->
