@@ -3,7 +3,7 @@ name: dev
 version: 1.1.0
 description: "PRD → 설계 → 구현 → 리뷰 → 커밋/PR까지 전체 개발 사이클을 에이전트 팀이 Q&A 루프로 수행"
 argument-hint: "<자연어 요청>"
-allowed-tools: ["Bash(git *)", "Bash(test *)", "Bash(mkdir *)", "Bash(cp *)", "Bash(mv *)", "Bash(ls *)", "Bash(find *)", "Bash(pwd *)", "Bash(basename *)", "Bash(dirname *)", "Bash(which *)", "Bash(./gradlew *)", "Bash(gh *)", "Bash(GH_HOST= *)", "Read", "Edit", "Write", "Glob", "Grep", "Task", "AskUserQuestion"]
+allowed-tools: ["Bash(git *)", "Bash(test *)", "Bash(mkdir *)", "Bash(cp *)", "Bash(mv *)", "Bash(ls *)", "Bash(find *)", "Bash(pwd *)", "Bash(basename *)", "Bash(dirname *)", "Bash(which *)", "Bash(./gradlew *)", "Bash(gh *)", "Bash(GH_HOST= *)", "Read", "Edit", "Write", "Glob", "Grep", "Task", "AskUserQuestion", "Skill"]
 ---
 
 오케스트레이터. 직무 기반 Agent 팀과 Q&A 피드백 루프로 전체 개발 사이클을 관리한다.
@@ -15,9 +15,11 @@ allowed-tools: ["Bash(git *)", "Bash(test *)", "Bash(mkdir *)", "Bash(cp *)", "B
 이 스킬의 파일들은 프로젝트 루트의 `.claude/skills/dev/` 하위에 위치한다.
 Phase 파일이나 다른 스킬을 Read할 때, 현재 작업 디렉토리(프로젝트 루트)를 기준으로 절대 경로를 구성한다.
 
-다른 스킬의 프로세스를 실행할 때 아래 경로에서 Read한다:
-- `<프로젝트 루트>/.claude/skills/commit/SKILL.md`
-- `<프로젝트 루트>/.claude/skills/pull-request/SKILL.md`
+다른 스킬의 프로세스를 실행할 때 **반드시 `Skill` 도구로 호출**한다:
+- 커밋: `Skill("ttutak:commit")`
+- PR 생성: `Skill("ttutak:pull-request")`
+
+`Read()`로 스킬 파일을 읽어 인라인 실행하지 않는다. `Skill` 도구를 사용해야 스킬의 `allowed-tools` 제한이 시스템 레벨에서 강제된다.
 
 ## 인자
 

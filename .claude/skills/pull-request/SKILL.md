@@ -95,6 +95,14 @@ git diff <base-branch>...HEAD --stat
 
 커밋 메시지와 diff 통계를 분석하여 본문 작성.
 
+### dev 파이프라인 컨텍스트 연동
+
+PR 본문 생성 전에 `.dev/pr-context.md` 파일 존재 여부를 확인한다:
+- **존재하면**: Read하여 내용을 PR 본문에 반영한다.
+  - `## Background` 항목이 있으면 PR 본문의 Background 섹션에 병합한다.
+  - `## Audit Summary` 항목이 있으면 PR 본문의 Checklist 앞에 해당 섹션을 삽입한다.
+- **존재하지 않으면**: 이 단계를 건너뛴다 (독립 호출 시 정상 동작).
+
 ```
 ## Background
 이 변경이 필요한 배경을 설명한다. 어떤 문제가 있었는지, 비즈니스 맥락은 무엇인지를
@@ -158,7 +166,7 @@ PR이 성공적으로 생성되었으면:
 
 1. `.claude/config.json`의 `notifications.slack` 확인
    - `enabled`가 `false`이거나 `webhookUrl`이 비어있으면:
-     "Slack 알림이 설정되어 있지 않습니다. `/setup`을 실행하면 웹훅을 연동할 수 있습니다." 안내 후 건너뜀
+     "Slack 알림이 설정되어 있지 않습니다. `/ttutak:setup`을 실행하면 웹훅을 연동할 수 있습니다." 안내 후 건너뜀
 
 2. 전송 (`timeout: 10000`):
 

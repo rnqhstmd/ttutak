@@ -89,7 +89,7 @@ gh auth login --hostname github.com --git-protocol https --web 2>&1
 ### 3단계: context/ 초기 구조 안내
 
 프로젝트 루트에 `context/` 디렉토리가 없으면:
-- "도메인 지식을 관리하려면 `/context`로 context/ 디렉토리를 생성하세요." 안내
+- "도메인 지식을 관리하려면 `/ttutak:context`로 context/ 디렉토리를 생성하세요." 안내
 
 이미 있으면 건너뛴다.
 
@@ -135,12 +135,12 @@ gh auth login --hostname github.com --git-protocol https --web 2>&1
 
 ```
 === 퀵스타트 ===
-/context {도메인}     → 도메인 지식 등록
-/lens {질문}          → 현행 분석 + 영향도
-/dev {요청}           → 전체 개발 사이클 (PRD~PR)
+/ttutak:context {도메인}     → 도메인 지식 등록
+/ttutak:lens {질문}          → 현행 분석 + 영향도
+/ttutak:dev {요청}           → 전체 개발 사이클 (PRD~PR)
 
 💡 화면 설계서가 있다면:
-requirements/ 폴더에 넣고 /context {도메인} --from requirements/ 로 등록
+requirements/ 폴더에 넣고 /ttutak:context {도메인} --from requirements/ 로 등록
 ```
 
 ## 주의사항

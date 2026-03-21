@@ -251,5 +251,5 @@ Q2 답변(또는 `--format`)에 따라 결과물을 작성한다.
 - 결과 파일: .research/{파일명}.md
 - 소스: {N}개 참조
 
-/context <도메인명> --from .research/{파일명}.md 로 context에 반영할 수 있습니다.
+/ttutak:context <도메인명> --from .research/{파일명}.md 로 context에 반영할 수 있습니다.
 ```
