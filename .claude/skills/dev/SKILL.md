@@ -16,6 +16,7 @@ allowed-tools: ["Bash(git *)", "Bash(test *)", "Bash(mkdir *)", "Bash(cp *)", "B
 Phase 파일이나 다른 스킬을 Read할 때, 현재 작업 디렉토리(프로젝트 루트)를 기준으로 절대 경로를 구성한다.
 
 다른 스킬의 프로세스를 실행할 때 **반드시 `Skill` 도구로 호출**한다:
+- 테스트: `Skill("ttutak:test")`
 - 커밋: `Skill("ttutak:commit")`
 - PR 생성: `Skill("ttutak:pull-request")`
 
@@ -142,14 +143,14 @@ ARGS[0]이 없고 모드도 판정되지 않으면 다음을 응답:
 | design | 설계 Q&A | architect + design-critic (선택적) | Yes (max 2) |
 | implement | 구현 + 자기점검 | coder + qa-manager | Self-check (1회) |
 | review | 검토 + 감사 | qa-manager + security-auditor (병렬) | Yes (max 2) |
-| complete | 완료 | product-owner (인수) + (스킬 참조) | 인수 재시도 (max 1) |
+| complete | 완료 | product-owner (인수) + test 스킬 + commit/PR 스킬 | 인수 재시도 (max 1) |
 
 ### Hotfix 경로 (`--hotfix`)
 
 긴급 버그 수정용 경량 경로. 설계/리뷰를 건너뛰지만, **경량 PRD와 인수 검증은 실행**한다:
 ```
 --hotfix: setup → requirements (경량) → implement → complete (인수검증 포함)
-정상:     setup → requirements → design → implement → review → complete
+정상:     setup → requirements → design → implement → review → complete (test → commit → PR)
 ```
 - requirements: product-owner가 소형 PRD를 작성한다 (배경 + 요구사항 + 수용 기준만).
 - design: 건너뛴다. coder가 PRD와 코드 맵을 기반으로 직접 구현한다.
@@ -512,7 +513,7 @@ AskUserQuestion(
 - `--phase design`: setup (필요 시) + requirements + design만 실행. 대화 맥락에 요구사항이 없고 `.dev/prd.md`도 없으면 requirements부터 시작.
 - `--phase implement`: 환경 감지 + implement 실행. 대화 맥락에 설계서가 없고 `.dev/design.md`도 없으면: "설계서가 필요합니다. `/dev --phase design`을 먼저 실행하거나 설계 내용을 입력해주세요." 후 중단.
 - `--phase review`: 환경 감지 + 베이스 브랜치 감지 + review 실행 (현재 변경사항을 리뷰).
-- `--phase complete`: 환경 감지 + 베이스 브랜치 감지 + complete 실행 (test, commit, PR).
+- `--phase complete`: 환경 감지 + 베이스 브랜치 감지 + complete 실행 (인수 검증, test, commit, PR, status 갱신).
 
 > **환경 감지**: 위 3개 모드는 phase-setup을 건너뛰므로, Phase 진입 전에 다음을 수행한다:
 > 1. `git rev-parse --is-inside-work-tree`로 git repo 확인.
