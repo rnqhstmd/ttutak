@@ -24,28 +24,38 @@ PRD가 있으면 (`.dev/prd.md`), product-owner에게 인수 검증을 요청한
 위 Step 0 진입 조건에 의해 PRD 부재 또는 `--hotfix` 모드이면 이 단계 전체가 건너뛰어진다.
 
 ## Step 1: Commit
-`commit` 스킬을 Read하여 프로세스를 실행한다 (test → commit 일괄).
+`Skill("ttutak:commit")`을 호출하여 커밋한다 (test → commit 일괄).
 
 **test 실패 시 자동 수정 (1회):**
-1. commit이 test 실패로 중단하면, 실패 로그와 코드 맵, PROJECT_ROOT를 `Task(subagent_type="coder")`에 전달하여 수정 요청.
-2. 수정 완료 후 commit을 재호출한다.
+1. commit 스킬이 test 실패로 중단하면, 실패 로그와 코드 맵, PROJECT_ROOT를 `Task(subagent_type="coder")`에 전달하여 수정 요청.
+2. 수정 완료 후 `Skill("ttutak:commit")`을 다시 호출한다.
 3. 재호출도 실패하면 사용자에게 실패 목록을 보고하고 진행 여부를 확인한다.
 
 ## Step 2: PR 생성
-`pull-request` 스킬을 Read하여 프로세스를 실행한다. pull-request은 독립 스킬이므로 dev 컨텍스트를 알지 못한다. 오케스트레이터가 PR 본문을 구성할 때 아래 내용을 직접 조립하여 pull-request의 본문 생성 과정에 반영한다:
+`Skill("ttutak:pull-request")`를 호출하여 PR을 생성한다. pull-request은 독립 스킬이므로 dev 컨텍스트를 알지 못한다. 오케스트레이터가 **스킬 호출 전에** `.dev/pr-context.md`를 조립하여 비즈니스 맥락을 전달한다.
 
-1. **비즈니스 맥락 조립**: pull-request이 PR 본문을 생성할 때, 오케스트레이터가 다음을 "비즈니스 맥락"으로 함께 전달한다:
-   - PRD의 "배경"과 "요구사항", 설계서의 "배경 및 목적". `--hotfix`이면 ARGS[0]을 사용.
-   - pull-request의 Background/Requirements 섹션에 이 내용이 반영된다.
-2. **Trust Ledger 요약 삽입**: `.dev/trust-ledger.md`가 존재하면 Read하여, pull-request이 생성하는 PR 본문의 Checklist 앞에 `## Audit Summary` 섹션을 추가한다:
+### Step 2-1: `.dev/pr-context.md` 조립 (Skill 호출 전)
+
+오케스트레이터가 아래 내용을 `.dev/pr-context.md`에 Write한다:
+
+1. **비즈니스 맥락**: PRD의 "배경"과 "요구사항", 설계서의 "배경 및 목적". `--hotfix`이면 ARGS[0]을 사용.
+2. **Trust Ledger 요약**: `.dev/trust-ledger.md`가 존재하면 Read하여 아래 형식으로 포함한다:
    ```
    ## Audit Summary
    - 총 N건 (CRITICAL: n, HIGH: n, MEDIUM: n)
    - [주요 발견 항목 1줄 요약] (최대 5건)
    ```
    Trust Ledger가 없으면 이 섹션을 생략한다.
-3. pull-request이 전제조건 미충족(gh 미설치, remote 미설정 등)으로 종료하면, 오케스트레이터는 후속 안내를 추가한다: "나중에 `/pull-request`로 PR을 생성할 수 있습니다."
-4. **PR 생성 후 알림**: PR이 성공적으로 생성되었으면, pull-request 스킬의 "PR 생성 후 알림" 섹션을 **반드시 실행**한다. 이 단계는 PR 생성과 분리되어 누락되기 쉬우므로, PR URL을 받은 직후 알림 전송 절차를 즉시 수행할 것. 중단 후 재개 시에도 PR이 생성되었으나 알림이 미전송 상태이면 알림부터 실행한다.
+
+### Step 2-2: `Skill("ttutak:pull-request")` 호출
+
+`.dev/pr-context.md` 조립이 완료된 후 `Skill("ttutak:pull-request")`를 호출한다.
+pull-request 스킬이 `.dev/pr-context.md`를 자동 감지하여 PR 본문에 반영한다.
+
+### Step 2-3: 후속 처리
+
+- pull-request 스킬이 전제조건 미충족(gh 미설치, remote 미설정 등)으로 종료하면, 오케스트레이터는 후속 안내를 추가한다: "나중에 `/ttutak:pull-request`로 PR을 생성할 수 있습니다."
+- **PR 생성 후 알림**: pull-request 스킬이 알림까지 처리한다. 스킬 종료 후 알림이 누락된 정황이 있으면 (PR URL은 있으나 알림 미전송) 오케스트레이터가 알림 전송을 직접 수행한다.
 
 ## Step 3: 도메인 status.md 갱신
 
