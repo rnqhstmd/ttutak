@@ -9,7 +9,6 @@
   "repository": "https://github.com/rnqhstmd/ttutak",
   "keywords": ["java", "spring-boot", "vue", "fullstack", "korean", "dev-workflow", "prd", "code-review"],
   "skills": "./.claude/skills/",
-  "agents": "./.claude-plugin/agents/",
   "hooks": {
     "PreToolUse": [
       {
