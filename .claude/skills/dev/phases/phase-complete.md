@@ -23,18 +23,25 @@ PRD가 있으면 (`.dev/prd.md`), product-owner에게 인수 검증을 요청한
 
 위 Step 0 진입 조건에 의해 PRD 부재 또는 `--hotfix` 모드이면 이 단계 전체가 건너뛰어진다.
 
-## Step 1: Commit
-`Skill("ttutak:commit")`을 호출하여 커밋한다 (test → commit 일괄).
+## Step 1: 테스트 작성
+`Skill("ttutak:test")`를 호출하여 구현된 코드에 대한 테스트를 작성한다.
 
-**test 실패 시 자동 수정 (1회):**
-1. commit 스킬이 test 실패로 중단하면, 실패 로그와 코드 맵, PROJECT_ROOT를 `Task(subagent_type="coder")`에 전달하여 수정 요청.
+test 스킬이 `.dev/prd.md`를 자동 감지하여 수용 기준(AC)을 테스트 케이스로 변환한다.
+
+**건너뛰기 조건**: `--hotfix` 모드이면 이 단계를 건너뛴다.
+
+## Step 2: Commit
+`Skill("ttutak:commit")`을 호출하여 커밋한다 (build/test 실행 → commit 일괄).
+
+**build/test 실패 시 자동 수정 (1회):**
+1. commit 스킬이 build/test 실패로 중단하면, 실패 로그와 코드 맵, PROJECT_ROOT를 `Task(subagent_type="coder")`에 전달하여 수정 요청.
 2. 수정 완료 후 `Skill("ttutak:commit")`을 다시 호출한다.
 3. 재호출도 실패하면 사용자에게 실패 목록을 보고하고 진행 여부를 확인한다.
 
-## Step 2: PR 생성
+## Step 3: PR 생성
 `Skill("ttutak:pull-request")`를 호출하여 PR을 생성한다. pull-request은 독립 스킬이므로 dev 컨텍스트를 알지 못한다. 오케스트레이터가 **스킬 호출 전에** `.dev/pr-context.md`를 조립하여 비즈니스 맥락을 전달한다.
 
-### Step 2-1: `.dev/pr-context.md` 조립 (Skill 호출 전)
+### Step 3-1: `.dev/pr-context.md` 조립 (Skill 호출 전)
 
 오케스트레이터가 아래 내용을 `.dev/pr-context.md`에 Write한다:
 
@@ -47,17 +54,17 @@ PRD가 있으면 (`.dev/prd.md`), product-owner에게 인수 검증을 요청한
    ```
    Trust Ledger가 없으면 이 섹션을 생략한다.
 
-### Step 2-2: `Skill("ttutak:pull-request")` 호출
+### Step 3-2: `Skill("ttutak:pull-request")` 호출
 
 `.dev/pr-context.md` 조립이 완료된 후 `Skill("ttutak:pull-request")`를 호출한다.
 pull-request 스킬이 `.dev/pr-context.md`를 자동 감지하여 PR 본문에 반영한다.
 
-### Step 2-3: 후속 처리
+### Step 3-3: 후속 처리
 
 - pull-request 스킬이 전제조건 미충족(gh 미설치, remote 미설정 등)으로 종료하면, 오케스트레이터는 후속 안내를 추가한다: "나중에 `/ttutak:pull-request`로 PR을 생성할 수 있습니다."
 - **PR 생성 후 알림**: pull-request 스킬이 알림까지 처리한다. 스킬 종료 후 알림이 누락된 정황이 있으면 (PR URL은 있으나 알림 미전송) 오케스트레이터가 알림 전송을 직접 수행한다.
 
-## Step 3: 도메인 status.md 갱신
+## Step 4: 도메인 status.md 갱신
 
 `DOMAIN_CONTEXT`가 있고 (phase-setup에서 도메인 매칭 성공), Step 0 인수 검증이 ACCEPT이면 실행한다. 그 외에는 건너뛴다.
 
@@ -71,7 +78,7 @@ pull-request 스킬이 `.dev/pr-context.md`를 자동 감지하여 PR 본문에 
    status.md 갱신: ✅ AC-1, AC-4, AC-7 (FR-1, FR-16, FR-19)
    ```
 
-## Step 4: context 환류 제안
+## Step 5: context 환류 제안
 
 `DOMAIN_CONTEXT`가 있으면 실행한다. 없으면 건너뛴다.
 
@@ -88,10 +95,10 @@ PRD와 설계서에서 context 갱신 후보를 추출하여 사용자에게 제
 
 **임의 반영 금지**: 사용자 승인 없이 context 문서를 수정하지 않는다.
 
-## Step 5: 진행 상태 완료
+## Step 6: 진행 상태 완료
 `.dev/state.md`의 `status`를 `completed`, `phases.complete`를 `completed`로 갱신한다.
 
-## Step 6: 다음 단계
+## Step 7: 다음 단계
 
 PR이 생성되었으면 완료이다. **PR 머지는 절대 실행하지 않는다** — 머지는 리뷰어가 직접 수행한다.
 
