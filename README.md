@@ -2,7 +2,9 @@
 
 # ttutak 뚝딱
 
-**PRD, 설계, 구현, 리뷰, PR까지 처리하는 개발 자동화 플러그인**
+**"개발해줘" 한마디면 PRD, 설계, 구현, 리뷰, 테스트, PR까지 뚝딱.**
+
+말하면 만들어주는 Claude Code 개발 자동화 플러그인
 
 [![GitHub Pages](https://img.shields.io/badge/GitHub_Pages-2ea44f?style=for-the-badge)](https://rnqhstmd.github.io/ttutak/)
 
