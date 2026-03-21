@@ -1,0 +1,26 @@
+{
+  "name": "ttutak",
+  "description": "개발 자동화 플러그인. PRD, 설계, 구현, 리뷰, PR까지 에이전트 팀이 처리합니다.",
+  "version": "1.0.0",
+  "author": {
+    "name": "rnqhstmd"
+  },
+  "homepage": "https://github.com/rnqhstmd/ttutak",
+  "repository": "https://github.com/rnqhstmd/ttutak",
+  "keywords": ["java", "spring-boot", "vue", "fullstack", "korean", "dev-workflow", "prd", "code-review"],
+  "skills": "./.claude/skills/",
+  "agents": "./.claude-plugin/agents/",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/.claude/hooks/pre-tool-guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
