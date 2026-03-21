@@ -94,10 +94,10 @@ ARGS를 파싱하여 아래 변수를 결정한다:
 
 ### 도메인 자동 감지 (TARGET_DOMAIN 미지정 시)
 
-1. **dev 파이프라인 컨텍스트 확인**: `.dev/prd.md`와 `.dev/design.md`가 존재하면 Read하여 대상 도메인과 수용 기준(AC)을 추출한다.
-2. **변경 파일 기반 감지**: dev 컨텍스트가 없으면 최근 변경 파일에서 도메인을 추출한다:
+1. **dev 파이프라인 컨텍스트 확인**: `.dev/prd.md`가 존재하면 Read하여 대상 도메인과 수용 기준(AC)을 추출한다. `.dev/design.md`도 존재하면 함께 참조하되, PRD만 있어도 AC 추출은 가능하다.
+2. **변경 파일 기반 감지**: dev 컨텍스트가 없으면 Git 기준 브랜치와의 변경 파일에서 도메인을 추출한다. 기준 브랜치는 `.dev/state.md`의 `base` 또는 원격 기본 브랜치(`origin/HEAD`)와 `git merge-base`를 사용해 계산한다:
    ```
-   git diff main --name-only
+   git diff "$(git merge-base HEAD origin/HEAD)" --name-only
    ```
    변경 파일의 경로에서 도메인 패키지/디렉토리를 식별한다.
 3. **감지 불가 시**: AskUserQuestion으로 사용자에게 도메인을 입력받는다.

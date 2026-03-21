@@ -31,10 +31,10 @@ test 스킬이 `.dev/prd.md`를 자동 감지하여 수용 기준(AC)을 테스�
 **건너뛰기 조건**: `--hotfix` 모드이면 이 단계를 건너뛴다.
 
 ## Step 2: Commit
-`Skill("ttutak:commit")`을 호출하여 커밋한다 (build/test 실행 → commit 일괄).
+`Skill("ttutak:commit")`을 호출하여 커밋한다 (build 실행 → commit 일괄).
 
-**build/test 실패 시 자동 수정 (1회):**
-1. commit 스킬이 build/test 실패로 중단하면, 실패 로그와 코드 맵, PROJECT_ROOT를 `Task(subagent_type="coder")`에 전달하여 수정 요청.
+**build 실패 시 자동 수정 (1회):**
+1. commit 스킬이 build 실패로 중단하면, 실패 로그와 코드 맵, PROJECT_ROOT를 `Task(subagent_type="coder")`에 전달하여 수정 요청.
 2. 수정 완료 후 `Skill("ttutak:commit")`을 다시 호출한다.
 3. 재호출도 실패하면 사용자에게 실패 목록을 보고하고 진행 여부를 확인한다.
 

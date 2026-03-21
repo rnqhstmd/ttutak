@@ -449,7 +449,7 @@
   <!-- Overview -->
   <section id="overview">
     <h2>개요</h2>
-    <p>ttutak은 Claude Code 위에서 동작하는 개발 자동화 플러그인입니다. 8개 스킬, 9개 에이전트가 협업하여 자연어 요청 하나로 전체 개발 사이클을 수행합니다.</p>
+    <p>ttutak은 Claude Code 위에서 동작하는 개발 자동화 플러그인입니다. 9개 스킬, 9개 에이전트가 협업하여 자연어 요청 하나로 전체 개발 사이클을 수행합니다.</p>
 
     <div class="card-grid">
       <div class="card">
@@ -487,7 +487,7 @@
 
   <!-- Skills -->
   <section id="skills">
-    <h2>8개 스킬</h2>
+    <h2>9개 스킬</h2>
 
     <table>
       <thead>
@@ -1111,9 +1111,9 @@ references/
 "단위 테스트만 작성해줘 --type unit"             ← 유형 선택
 "커버리지 90% 목표로 테스트해줘 --coverage 90"   ← 커버리지 목표</code></pre>
 
-    <h3>테스트 유형별 생성 위치</h3>
+    <h3>테스트 유형별 생성 위치 (예시)</h3>
     <table>
-      <thead><tr><th>유형</th><th>위치 패턴</th><th>검증 대상</th></tr></thead>
+      <thead><tr><th>유형</th><th>위치 패턴 (테스트 루트 하위 상대 경로)</th><th>검증 대상</th></tr></thead>
       <tbody>
         <tr><td><strong>단위</strong></td><td><code>domain/{도메인}/{Entity}Test</code></td><td>엔티티, VO, 도메인 서비스</td></tr>
         <tr><td><strong>통합</strong></td><td><code>domain/{도메인}/{Service}IntegrationTest</code></td><td>서비스 계층, 리포지토리, 캐시</td></tr>
