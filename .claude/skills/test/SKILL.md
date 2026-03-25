@@ -82,10 +82,9 @@ ARGS를 파싱하여 아래 변수를 결정한다:
 | 프로젝트 타입 | 감지 파일 | 프레임워크 | 테스트 루트 |
 |--------------|----------|-----------|-----------|
 | java-spring | `build.gradle.kts` 또는 `build.gradle` | JUnit 5 | `src/test/` |
-| node | `package.json` | Jest 또는 Vitest (`devDependencies` 확인) | `__tests__/` 또는 `*.test.ts` |
-| python | `pyproject.toml` 또는 `setup.py` | pytest | `tests/` |
+| kotlin-gradle | `build.gradle.kts` (Kotlin Spring Boot) | JUnit 5 | `src/test/` |
 
-감지 불가 시 AskUserQuestion으로 사용자에게 테스트 프레임워크와 디렉토리를 입력받는다.
+프로젝트 타입 가드에 의해 위 타입 외에는 이 단계에 도달하지 않는다.
 
 ### 0-3: 기존 테스트 구조 분석
 

@@ -5,7 +5,7 @@
 ### `--resume` 플래그가 있는 경우
 1. state.md 탐색을 위해 현재 브랜치명에서 **임시** 경로를 계산한다: `git branch --show-current` → `/`를 `-`로 치환 → `.dev/{branch-slug}/state.md`.
 2. 해당 경로의 state.md를 탐색한다.
-3. 존재하고 `status: in_progress`이면 → DEV_DIR을 해당 경로로 확정하고 바로 재개 (아래 "이어서 진행" 절차).
+3. 존재하고 `status: in_progress`이면 → DEV_DIR을 해당 파일의 부모 디렉토리(`.dev/{branch-slug}/`)로 확정하고 바로 재개 (아래 "이어서 진행" 절차).
 4. state.md가 없거나 `status: completed`이면 → "재개할 작업이 없습니다." 출력 후 종료.
 
 ### `--resume` 플래그가 없는 경우 (자동 감지)
