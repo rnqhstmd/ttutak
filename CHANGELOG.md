@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.1.2 (2026-03-25) — dev 산출물 브랜치별 분리 + test 스킬 Spring 전용화
+
+### Fixes
+- **dev 산출물 경로 분리**: `.dev/` → `.dev/{branch-slug}/` 브랜치별 폴더로 변경하여 기능별 개발 과정 보존
+- **DEV_DIR 변수 도입**: 모든 Phase·스킬에서 일관된 산출물 경로 참조
+- **--phase 단독 실행 버그**: implement/review/complete 단독 실행 시 DEV_DIR 미정의 수정
+- **pull-request pr-context 탐색**: glob 패턴 대신 정확한 DEV_DIR 계산으로 변경
+
+### Enhancements
+- **test 스킬 Spring 전용 가드**: `java-spring`/`kotlin-gradle` 이외 프로젝트에서 안내 후 종료
+
 ## v1.1.1 (2026-03-21) — test 스킬 추가
 
 ### Features
