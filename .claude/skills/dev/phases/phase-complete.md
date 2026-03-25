@@ -30,7 +30,12 @@ test 스킬이 `.dev/prd.md`를 자동 감지하여 수용 기준(AC)을 테스�
 
 **건너뛰기 조건**: `--hotfix` 모드이면 이 단계를 건너뛴다.
 
-## Step 2: Commit
+## Step 2: Commit (Gate: Step 1 완료 필수)
+
+> **CRITICAL: Step 1(테스트)이 완료되었거나, `--hotfix` 모드로 Step 1이 건너뛰어진 경우에만 이 Step에 진입한다.**
+> Step 1을 실행하지 않고 커밋/PR을 먼저 실행하는 것은 절대 금지한다.
+> 테스트 실행 → 커밋 → PR 순서를 반드시 지킨다.
+
 `Skill("ttutak:commit")`을 호출하여 커밋한다 (build 실행 → commit 일괄).
 
 **build 실패 시 자동 수정 (1회):**
