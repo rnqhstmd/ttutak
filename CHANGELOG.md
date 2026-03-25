@@ -10,6 +10,8 @@
 
 ### Enhancements
 - **test 스킬 Spring 전용 가드**: `java-spring`/`kotlin-gradle` 이외 프로젝트에서 안내 후 종료
+- **research 스킬 인터뷰 질문**: 번호 선택지를 AskUserQuestion 구조화 형식으로 변환
+- **히어로 설명 문구 개선**: README 및 index.html의 소개 문구 업데이트
 
 ## v1.1.1 (2026-03-21) — test 스킬 추가
 
