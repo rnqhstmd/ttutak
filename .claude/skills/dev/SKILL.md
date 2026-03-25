@@ -92,7 +92,7 @@ ARGS[0]이 없고 모드도 판정되지 않으면 다음을 응답:
 ### --status 동작
 `--status`가 지정되면 파이프라인을 실행하지 않고 현재 상태만 출력한다:
 
-1. phase-setup의 0.0과 동일한 방식으로 `.dev/state.md`를 탐색한다.
+1. 현재 브랜치명에서 DEV_DIR을 계산하고 (`git branch --show-current` → `/`를 `-`로 치환 → `.dev/{branch-slug}/`), `${DEV_DIR}/state.md`를 탐색한다.
 2. state.md가 없으면: "진행 중인 파이프라인이 없습니다." 출력 후 종료.
 3. state.md가 있으면 다음을 출력:
    ```
@@ -188,11 +188,11 @@ else:  # NORMAL
 for phase in PHASES:
 
     # 2a. 산출물 게이트 — 이전 Phase 산출물이 없으면 이전 Phase부터 실행 (순서 중요: 상위 의존성 먼저 체크)
-    if phase == "design" and not exists(".dev/prd.md"):
+    if phase == "design" and not exists("${DEV_DIR}/prd.md"):
         → phase-requirements부터 실행
-    if phase == "implement" and not exists(".dev/prd.md"):
+    if phase == "implement" and not exists("${DEV_DIR}/prd.md"):
         → phase-requirements부터 실행
-    if phase == "implement" and not hotfix and not exists(".dev/design.md"):
+    if phase == "implement" and not hotfix and not exists("${DEV_DIR}/design.md"):
         → phase-design부터 실행
     if phase == "review" and git diff --stat이 비어있음:
         → "변경사항이 없습니다" 보고 후 중단
@@ -240,7 +240,7 @@ Phase 실행 시 반드시 이 스킬에 정의된 Agent 팀(product-owner, arch
 
 **생성**: phase-setup의 Step 0.4에서 초기 맵을 생성한다.
 **누적**: 각 agent 출력에 "탐색 추가 항목" 섹션이 있으면 해당 항목을 맵에 append한다. 누적 맵은 **최대 25개**로 제한한다. 초과 시 참조 파일부터 제거한다.
-**저장**: 코드 맵이 갱신될 때마다 `.dev/codemap.md`에 Write한다.
+**저장**: 코드 맵이 갱신될 때마다 `${DEV_DIR}/codemap.md`에 Write한다.
 **전달**: 모든 agent 호출 시 현재 코드 맵을 프롬프트에 포함한다.
 
 ## Trust Ledger (신뢰 원장)
@@ -258,7 +258,7 @@ security-auditor의 감사 결과를 누적하는 문서. 오케스트레이터�
 ```
 
 **생성**: phase-review에서 ZT 통합 감사 완료 시 생성.
-**저장**: `.dev/trust-ledger.md`에 저장한다.
+**저장**: `${DEV_DIR}/trust-ledger.md`에 저장한다.
 **전달**: PR 본문에 감사 결과 요약으로 포함한다.
 
 ---
@@ -269,7 +269,8 @@ security-auditor의 감사 결과를 누적하는 문서. 오케스트레이터�
 phase-setup에서 결정된 변수를 이후 모든 Phase에서 사용한다:
 - `GIT_PREFIX`: 항상 `git`. 소비 프로젝트 루트에서 직접 실행한다.
 - `PROJECT_ROOT`: 항상 `./` (현재 디렉토리).
-- `DIFF_FILE`: 변경사항 diff를 저장하는 파일 경로. `.dev/diff.txt`. Diff 수집 규칙에 따라 phase-implement(자기점검), phase-review, phase-complete에서 갱신된다.
+- `DEV_DIR`: 브랜치별 dev 산출물 디렉토리. `.dev/{branch-slug}/` 형식. branch-slug는 브랜치명의 `/`를 `-`로 치환한 값이다 (예: `feat/login` → `.dev/feat-login/`). phase-setup Step 6.5에서 브랜치 생성/전환 후 결정된다.
+- `DIFF_FILE`: 변경사항 diff를 저장하는 파일 경로. `${DEV_DIR}/diff.txt`. Diff 수집 규칙에 따라 phase-implement(자기점검), phase-review, phase-complete에서 갱신된다.
 - `DOMAIN_CONTEXT`: phase-setup 0.3에서 `context/*/PROJECTS.md` 매칭으로 로드된 도메인 용어(glossary)와 아키텍처 정보. 매칭되지 않으면 빈 상태.
 - `REFERENCES`: phase-setup Step 3.5에서 `references/` 디렉토리를 탐색하여 수집한 외부 규격 문서 목록(파일 경로 + 한줄 설명). `references/` 디렉토리가 없으면 빈 상태. 빈 상태이면 에이전트 프롬프트에 포함하지 않는다.
 - Agent에게 `PROJECT_ROOT` 경로를 항상 전달하여 파일 도구(Read/Write/Edit/Glob/Grep)의 기준점으로 사용하게 한다.
@@ -293,22 +294,22 @@ Agent prompt 크기를 관리하기 위해:
 ### Agent 결과 전달 규칙 (컨텍스트 경량화)
 Agent 출력을 사용자에게 전달할 때, **Phase 상태에 따라** 전문 표시 여부를 결정한다:
 - **Q&A Phase** (requirements, design): Agent 출력의 첫 표시는 항상 **전문 표시**한다 (사용자가 산출물을 검토할 수 있도록). Phase 파일의 구체적인 표시 규칙이 이 일반 규칙보다 우선한다.
-- **Q&A Phase 완료 보고**: 확정된 산출물을 파일에 저장하고, 사용자에게는 **요약만** 보고한다 ("PRD 확정. .dev/prd.md에 저장됨" 등).
+- **Q&A Phase 완료 보고**: 확정된 산출물을 파일에 저장하고, 사용자에게는 **요약만** 보고한다 ("PRD 확정. ${DEV_DIR}/prd.md에 저장됨" 등).
 - **Q&A 없는 Phase** (implement, review, complete): Agent 출력의 **요약만** 사용자에게 표시한다. 전문은 파일에 저장하거나 변수에 보관한다.
 
 이후 Phase에서 이전 산출물이 필요하면 **파일을 Read하여 Agent prompt에 포함**하되, 오케스트레이터 자신의 출력에는 포함하지 않는다. 각 Phase 파일에서 구체적인 요약 포맷을 정의한다.
 
 ### 문서 보관
-- phase-requirements 완료 시 확정된 PRD를 `.dev/prd.md`에 저장한다.
-- phase-design 완료 시 확정된 설계 문서를 `.dev/design.md`에 저장한다.
-- Trust Ledger를 `.dev/trust-ledger.md`에 저장한다.
-- 코드 맵을 `.dev/codemap.md`에 저장한다 (갱신 시마다).
-- 자기점검 결과를 `.dev/self-check.md`에 저장한다 (phase-implement 자기점검 완료 시).
+- phase-requirements 완료 시 확정된 PRD를 `${DEV_DIR}/prd.md`에 저장한다.
+- phase-design 완료 시 확정된 설계 문서를 `${DEV_DIR}/design.md`에 저장한다.
+- Trust Ledger를 `${DEV_DIR}/trust-ledger.md`에 저장한다.
+- 코드 맵을 `${DEV_DIR}/codemap.md`에 저장한다 (갱신 시마다).
+- 자기점검 결과를 `${DEV_DIR}/self-check.md`에 저장한다 (phase-implement 자기점검 완료 시).
 - phase-design, phase-implement, phase-review 진입 시 해당 파일들을 Read하여 에이전트 프롬프트에 사용한다.
-- `.gitignore` 보강은 phase-setup의 Step 0.5a에서 프로젝트 타입별로 처리한다 (`.dev/` 포함).
+- `.gitignore` 보강은 phase-setup의 Step 0.5a에서 프로젝트 타입별로 처리한다 (`.dev/` 패턴 — 브랜치별 하위 폴더 전체 포함).
 
 ### 진행 상태 추적 (state.md)
-파이프라인 진행 상태를 `.dev/state.md`에 기록하여 세션 재개를 지원한다.
+파이프라인 진행 상태를 `${DEV_DIR}/state.md`에 기록하여 세션 재개를 지원한다.
 
 **state.md 구조:**
 ```yaml
@@ -430,21 +431,21 @@ Agent에게 변경사항 diff를 전달할 때, 메인 컨텍스트 절약을 �
 
 #### 수집 절차
 
-1. `DIFF_FILE = .dev/diff.txt`. **매 수집 시** `mkdir -p .dev`를 실행하여 디렉토리 존재를 보장한다.
+1. `DIFF_FILE = ${DEV_DIR}/diff.txt`. **매 수집 시** `mkdir -p ${DEV_DIR}`를 실행하여 디렉토리 존재를 보장한다.
 2. diff를 파일에 직접 리다이렉트한다 (Bash 결과에 diff가 나타나지 않음):
    ```bash
-   git diff --cached > .dev/diff.txt
+   git diff --cached > ${DEV_DIR}/diff.txt
    ```
-3. `wc -l < .dev/diff.txt`로 줄 수를 확인한다.
+3. `wc -l < ${DEV_DIR}/diff.txt`로 줄 수를 확인한다.
 4. 총 변경이 **500줄 이상**이면: `--stat` 요약을 파일 앞에 추가하고, 파일 끝에 "변경된 파일을 Read 도구로 직접 확인하라"는 안내를 추가한다:
    ```bash
-   git diff --cached --stat > .dev/diff.txt
-   echo "---" >> .dev/diff.txt
-   echo "위는 요약입니다. 변경된 파일을 Read 도구로 직접 확인하라." >> .dev/diff.txt
+   git diff --cached --stat > ${DEV_DIR}/diff.txt
+   echo "---" >> ${DEV_DIR}/diff.txt
+   echo "위는 요약입니다. 변경된 파일을 Read 도구로 직접 확인하라." >> ${DEV_DIR}/diff.txt
    ```
 5. Agent 프롬프트에는 **파일 경로만 전달**한다:
    ```
-   변경사항 diff: .dev/diff.txt
+   변경사항 diff: ${DEV_DIR}/diff.txt
    이 파일을 Read하여 변경사항을 확인하라.
    ```
 
@@ -515,14 +516,15 @@ AskUserQuestion(
 
 `--phase`가 지정되면 해당 Phase만 실행한다:
 - `--phase requirements`: setup (필요 시) + requirements만 실행 (PRD 작성).
-- `--phase design`: setup (필요 시) + requirements + design만 실행. 대화 맥락에 요구사항이 없고 `.dev/prd.md`도 없으면 requirements부터 시작.
-- `--phase implement`: 환경 감지 + implement 실행. 대화 맥락에 설계서가 없고 `.dev/design.md`도 없으면: "설계서가 필요합니다. `/dev --phase design`을 먼저 실행하거나 설계 내용을 입력해주세요." 후 중단.
+- `--phase design`: setup (필요 시) + requirements + design만 실행. 대화 맥락에 요구사항이 없고 `${DEV_DIR}/prd.md`도 없으면 requirements부터 시작.
+- `--phase implement`: 환경 감지 + implement 실행. 대화 맥락에 설계서가 없고 `${DEV_DIR}/design.md`도 없으면: "설계서가 필요합니다. `/dev --phase design`을 먼저 실행하거나 설계 내용을 입력해주세요." 후 중단.
 - `--phase review`: 환경 감지 + 베이스 브랜치 감지 + review 실행 (현재 변경사항을 리뷰).
 - `--phase complete`: 환경 감지 + 베이스 브랜치 감지 + complete 실행 (인수 검증, test, commit, PR, status 갱신).
 
 > **환경 감지**: 위 3개 모드는 phase-setup을 건너뛰므로, Phase 진입 전에 다음을 수행한다:
 > 1. `git rev-parse --is-inside-work-tree`로 git repo 확인.
-> 2. `PROJECT_ROOT` = 현재 디렉토리. 완료.
+> 2. `PROJECT_ROOT` = 현재 디렉토리.
+> 3. `git branch --show-current` → `/`를 `-`로 치환 → `DEV_DIR = .dev/{branch-slug}/`.
 
 ---
 

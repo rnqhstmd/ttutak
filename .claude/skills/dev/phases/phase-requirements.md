@@ -8,7 +8,7 @@
 - product-owner에게 "경량 PRD 작성"으로 동작할 것을 지시한다.
 - 포함 섹션: 배경 + 요구사항 + 수용 기준만 (3관점 품질 검증, Q&A 생략).
 - 작성 완료 후 사용자에게 전문 표시 + 승인 확인.
-- 승인 → `${PROJECT_ROOT}/.dev/prd.md`에 저장 후 phase-implement로 진행.
+- 승인 → `${PROJECT_ROOT}/${DEV_DIR}/prd.md`에 저장 후 phase-implement로 진행.
 - 수정 요청 → 1회 수정 후 저장.
 
 hotfix가 아닌 경우 아래 정상 플로우를 따른다.
@@ -54,8 +54,8 @@ hotfix가 아닌 경우 아래 정상 플로우를 따른다.
 - 수정 요청 → 후속 AskUserQuestion(자유입력)으로 수정 내용을 받아 product-owner를 1회 더 호출 후 phase-design으로 진행.
 
 **Phase 완료 후 저장**:
-1. `${PROJECT_ROOT}/.dev/` 디렉토리가 없으면 생성한다.
-2. 확정된 PRD를 `${PROJECT_ROOT}/.dev/prd.md`에 Write한다.
+1. `${PROJECT_ROOT}/${DEV_DIR}/` 디렉토리가 없으면 생성한다.
+2. 확정된 PRD를 `${PROJECT_ROOT}/${DEV_DIR}/prd.md`에 Write한다.
 
 **Phase 완료 보고 (요약 모드)**:
 PRD 저장 후 사용자에게 **요약만** 출력한다 (Step 2에서 이미 전문을 표시했으므로 반복하지 않음):
@@ -63,6 +63,6 @@ PRD 저장 후 사용자에게 **요약만** 출력한다 (Step 2에서 이미 �
 PRD 확정: <제목>
 - 핵심 요구사항: [Must] N건, [Should] N건, [Could] N건
 - 수용 기준: N건
-- 저장: .dev/prd.md
+- 저장: ${DEV_DIR}/prd.md
 ```
 이후 Phase에서 PRD가 필요하면 파일을 Read하여 Agent prompt에 포함한다.

@@ -3,16 +3,18 @@
 ## Step 0: 진행 중 작업 감지
 
 ### `--resume` 플래그가 있는 경우
-1. `.dev/state.md`를 탐색한다.
-2. 존재하고 `status: in_progress`이면 → 질문 없이 바로 재개 (아래 "이어서 진행" 절차).
-3. state.md가 없거나 `status: completed`이면 → "재개할 작업이 없습니다." 출력 후 종료.
+1. state.md 탐색을 위해 현재 브랜치명에서 **임시** 경로를 계산한다: `git branch --show-current` → `/`를 `-`로 치환 → `.dev/{branch-slug}/state.md`.
+2. 해당 경로의 state.md를 탐색한다.
+3. 존재하고 `status: in_progress`이면 → DEV_DIR을 해당 경로로 확정하고 바로 재개 (아래 "이어서 진행" 절차).
+4. state.md가 없거나 `status: completed`이면 → "재개할 작업이 없습니다." 출력 후 종료.
 
 ### `--resume` 플래그가 없는 경우 (자동 감지)
 ARGS[0]이 있으면 → 새 작업이므로 자동 감지를 건너뛰고 Step 1로 진행.
 ARGS[0]이 없으면 → 아래 자동 감지 로직 실행.
 
-1. `.dev/state.md`를 탐색한다.
-2. state.md가 존재하고 `status: in_progress`이면:
+1. state.md 탐색을 위해 현재 브랜치명에서 **임시** 경로를 계산한다: `git branch --show-current` → `/`를 `-`로 치환 → `.dev/{branch-slug}/state.md`.
+2. 해당 경로의 state.md를 탐색한다.
+3. state.md가 존재하고 `status: in_progress`이면:
    - 사용자에게 AskUserQuestion으로 질문: "이전에 진행하던 작업이 있습니다."
      - "이어서 진행" → 재개
      - "새로 시작" → Step 1로 진행 (Step 7에서 덮어씀)
@@ -21,7 +23,7 @@ ARGS[0]이 없으면 → 아래 자동 감지 로직 실행.
 **이어서 진행 시:**
 - state.md에서 GIT_PREFIX, PROJECT_ROOT, 베이스 브랜치, 프로젝트 타입, ARGS[0], flags를 복원.
 - `test -d`로 경로 검증. 실패 시 "작업 경로가 유효하지 않습니다." → 새로 시작.
-- prd.md, design.md, trust-ledger.md, codemap.md, self-check.md가 있으면 Read하여 맥락 복원.
+- `${DEV_DIR}/` 하위의 prd.md, design.md, trust-ledger.md, codemap.md, self-check.md가 있으면 Read하여 맥락 복원.
 - `references/` 디렉토리가 있으면 외부 규격 참조 탐색(Step 3.5)을 재실행하여 `REFERENCES`를 복원한다.
 - phases 맵에서 마지막 in_progress Phase를 찾아 재개.
 - phase-setup의 나머지 단계(Step 1~Step 7)를 건너뛴다.
@@ -94,10 +96,20 @@ ARGS[0]에서 도메인 키워드를 추출하여 `PROJECT_ROOT` 내에서 관�
 | java-spring | `.gradle/`, `build/` |
 | node | `node_modules/`, `dist/` |
 
-`.dev/` 패턴도 이 단계에서 함께 추가한다 (dev 스킬의 문서 보관 규칙과 통합).
+`.dev/` 패턴도 이 단계에서 함께 추가한다 (dev 스킬의 문서 보관 규칙과 통합. 브랜치별 하위 폴더 전체가 무시됨).
+
+## Step 6.5: DEV_DIR 결정
+
+브랜치명에서 dev 산출물 디렉토리를 결정한다:
+1. `git branch --show-current`로 현재 브랜치명을 가져온다.
+2. 브랜치명의 `/`를 `-`로 치환하여 branch-slug를 생성한다 (예: `feat/login` → `feat-login`).
+3. `DEV_DIR = .dev/{branch-slug}/` (예: `.dev/feat-login/`).
+4. `mkdir -p ${DEV_DIR}`로 디렉토리를 생성한다.
+
+이 `DEV_DIR`은 이후 모든 Phase에서 산출물 저장 경로로 사용된다.
 
 ## Step 7: 진행 상태 초기화
-`.dev/state.md`에 초기 상태를 Write한다:
+`${DEV_DIR}/state.md`에 초기 상태를 Write한다:
 - phase: setup, status: in_progress
 - branch, base, project-type, project-root, args, flags 기록
 - mode, intent-source 기록 (의도 파싱 결과)

@@ -16,8 +16,8 @@ hotfix가 아닌 경우 아래 정상 플로우를 따른다.
 **Task A**: coder 구현.
 
 **Step 0**: 문서 로드.
-- `${PROJECT_ROOT}/.dev/design.md`를 Read하여 설계서를 로드한다.
-- `${PROJECT_ROOT}/.dev/prd.md`를 Read하여 PRD를 로드한다 (자기점검에서 "요구사항"+"수용 기준" 섹션 사용).
+- `${PROJECT_ROOT}/${DEV_DIR}/design.md`를 Read하여 설계서를 로드한다.
+- `${PROJECT_ROOT}/${DEV_DIR}/prd.md`를 Read하여 PRD를 로드한다 (자기점검에서 "요구사항"+"수용 기준" 섹션 사용).
 
 **Step 1**: 구현 계획 승인.
 
@@ -190,7 +190,7 @@ Agent가 설계에서 벗어난 판단을 했다면 해당 내용을 특이사�
 - **Critical이 없으면**: 자기점검 완료.
 - Warning/Info는 `SELF_CHECK_FINDINGS` 변수에 저장한다. 형식: `[Warning] 파일:라인 - 설명` (한 줄씩). phase-review에서 qa-manager 프롬프트에 포함하여 중복 보고를 방지한다.
 - QUESTION은 `SELF_CHECK_QUESTIONS` 변수에 저장한다. phase-review에서 qa-manager 프롬프트에 포함하여 사용자 확인을 받는다.
-- 자기점검 결과(SELF_CHECK_FINDINGS + SELF_CHECK_QUESTIONS)를 `${PROJECT_ROOT}/.dev/self-check.md`에 Write한다. `--resume`으로 phase-review에서 재개할 때 이 파일을 Read하여 복원한다.
+- 자기점검 결과(SELF_CHECK_FINDINGS + SELF_CHECK_QUESTIONS)를 `${PROJECT_ROOT}/${DEV_DIR}/self-check.md`에 Write한다. `--resume`으로 phase-review에서 재개할 때 이 파일을 Read하여 복원한다.
 
 자기점검 결과를 사용자에게 **요약만** 보고한다 (Agent 전문 출력 금지):
 ```

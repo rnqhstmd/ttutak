@@ -97,7 +97,7 @@ git diff <base-branch>...HEAD --stat
 
 ### dev 파이프라인 컨텍스트 연동
 
-PR 본문 생성 전에 `.dev/pr-context.md` 파일 존재 여부를 확인한다:
+PR 본문 생성 전에 현재 브랜치명에서 DEV_DIR을 계산하고 (`git branch --show-current` → `/`를 `-`로 치환 → `.dev/{branch-slug}/`), `${DEV_DIR}/pr-context.md` 파일 존재 여부를 확인한다:
 - **존재하면**: Read하여 내용을 PR 본문에 반영한다.
   - `## Background` 항목이 있으면 PR 본문의 Background 섹션에 병합한다.
   - `## Audit Summary` 항목이 있으면 PR 본문의 Checklist 앞에 해당 섹션을 삽입한다.
