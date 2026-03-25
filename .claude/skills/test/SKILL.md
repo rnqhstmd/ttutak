@@ -37,6 +37,21 @@ allowed-tools:
 
 항상 한국어로 응답한다.
 
+## 지원 프로젝트 타입
+
+**Spring Boot 프로젝트 전용.** 이 스킬의 테스트 전략(도메인/인프라/인터페이스 레이어 분류, JUnit 5, `@SpringBootTest` 등)은 Spring Boot 아키텍처에 최적화되어 있다.
+
+### 프로젝트 타입 가드
+
+Step 0에서 프로젝트 타입을 감지한 후, `java-spring` 또는 `kotlin-gradle`이 **아닌** 경우:
+```
+"현재 test 스킬은 Spring Boot 프로젝트만 지원합니다.
+감지된 프로젝트 타입: {project-type}
+
+테스트를 직접 작성하시려면 프로젝트의 테스트 프레임워크에 맞게 요청해주세요."
+```
+출력 후 종료한다. 스킬을 계속 실행하지 않는다.
+
 ## 인자
 
 - `ARGS[0]` (optional): 도메인명 또는 자연어 요청. 미지정 시 변경된 코드 기반으로 자동 감지.
@@ -67,10 +82,9 @@ ARGS를 파싱하여 아래 변수를 결정한다:
 | 프로젝트 타입 | 감지 파일 | 프레임워크 | 테스트 루트 |
 |--------------|----------|-----------|-----------|
 | java-spring | `build.gradle.kts` 또는 `build.gradle` | JUnit 5 | `src/test/` |
-| node | `package.json` | Jest 또는 Vitest (`devDependencies` 확인) | `__tests__/` 또는 `*.test.ts` |
-| python | `pyproject.toml` 또는 `setup.py` | pytest | `tests/` |
+| kotlin-gradle | `build.gradle.kts` (Kotlin Spring Boot) | JUnit 5 | `src/test/` |
 
-감지 불가 시 AskUserQuestion으로 사용자에게 테스트 프레임워크와 디렉토리를 입력받는다.
+프로젝트 타입 가드에 의해 위 타입 외에는 이 단계에 도달하지 않는다.
 
 ### 0-3: 기존 테스트 구조 분석
 
@@ -94,8 +108,8 @@ ARGS를 파싱하여 아래 변수를 결정한다:
 
 ### 도메인 자동 감지 (TARGET_DOMAIN 미지정 시)
 
-1. **dev 파이프라인 컨텍스트 확인**: `.dev/prd.md`가 존재하면 Read하여 대상 도메인과 수용 기준(AC)을 추출한다. `.dev/design.md`도 존재하면 함께 참조하되, PRD만 있어도 AC 추출은 가능하다.
-2. **변경 파일 기반 감지**: dev 컨텍스트가 없으면 Git 기준 브랜치와의 변경 파일에서 도메인을 추출한다. 기준 브랜치는 `.dev/state.md`의 `base` 또는 원격 기본 브랜치(`origin/HEAD`)와 `git merge-base`를 사용해 계산한다:
+1. **dev 파이프라인 컨텍스트 확인**: 현재 브랜치명에서 DEV_DIR을 계산하고 (`git branch --show-current` → `/`를 `-`로 치환 → `.dev/{branch-slug}/`), `${DEV_DIR}/prd.md`가 존재하면 Read하여 대상 도메인과 수용 기준(AC)을 추출한다. `${DEV_DIR}/design.md`도 존재하면 함께 참조하되, PRD만 있어도 AC 추출은 가능하다.
+2. **변경 파일 기반 감지**: dev 컨텍스트가 없으면 Git 기준 브랜치와의 변경 파일에서 도메인을 추출한다. 기준 브랜치는 `${DEV_DIR}/state.md`의 `base` 또는 원격 기본 브랜치(`origin/HEAD`)와 `git merge-base`를 사용해 계산한다:
    ```
    git diff "$(git merge-base HEAD origin/HEAD)" --name-only
    ```
@@ -145,7 +159,7 @@ ARGS를 파싱하여 아래 변수를 결정한다:
 
 ### 2-3: dev 파이프라인 AC 연동
 
-`.dev/prd.md`가 존재하면 수용 기준(AC)을 테스트 케이스로 변환한다:
+`${DEV_DIR}/prd.md`가 존재하면 수용 기준(AC)을 테스트 케이스로 변환한다:
 - 각 AC를 검증하는 테스트가 이미 존재하는지 확인
 - 누락된 AC에 대한 테스트를 계획에 추가
 

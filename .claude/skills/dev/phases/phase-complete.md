@@ -5,7 +5,7 @@
 ## Step 0: 인수 검증 (ProductOwner)
 PRD가 없으면 이 단계를 건너뛴다.
 
-PRD가 있으면 (`.dev/prd.md`), product-owner에게 인수 검증을 요청한다.
+PRD가 있으면 (`${DEV_DIR}/prd.md`), product-owner에게 인수 검증을 요청한다.
 
 **diff 갱신**: phase-review 이후 coder 수정이 있었을 수 있으므로, `git add -A`로 스테이징한 후 **Diff 수집 규칙**에 따라 diff를 `DIFF_FILE`에 리다이렉트하여 갱신한다.
 
@@ -26,7 +26,7 @@ PRD가 있으면 (`.dev/prd.md`), product-owner에게 인수 검증을 요청한
 ## Step 1: 테스트 작성
 `Skill("ttutak:test")`를 호출하여 구현된 코드에 대한 테스트를 작성한다.
 
-test 스킬이 `.dev/prd.md`를 자동 감지하여 수용 기준(AC)을 테스트 케이스로 변환한다.
+test 스킬이 `${DEV_DIR}/prd.md`를 자동 감지하여 수용 기준(AC)을 테스트 케이스로 변환한다.
 
 **건너뛰기 조건**: `--hotfix` 모드이면 이 단계를 건너뛴다.
 
@@ -44,14 +44,14 @@ test 스킬이 `.dev/prd.md`를 자동 감지하여 수용 기준(AC)을 테스�
 3. 재호출도 실패하면 사용자에게 실패 목록을 보고하고 진행 여부를 확인한다.
 
 ## Step 3: PR 생성
-`Skill("ttutak:pull-request")`를 호출하여 PR을 생성한다. pull-request은 독립 스킬이므로 dev 컨텍스트를 알지 못한다. 오케스트레이터가 **스킬 호출 전에** `.dev/pr-context.md`를 조립하여 비즈니스 맥락을 전달한다.
+`Skill("ttutak:pull-request")`를 호출하여 PR을 생성한다. pull-request은 독립 스킬이므로 dev 컨텍스트를 알지 못한다. 오케스트레이터가 **스킬 호출 전에** `${DEV_DIR}/pr-context.md`를 조립하여 비즈니스 맥락을 전달한다.
 
-### Step 3-1: `.dev/pr-context.md` 조립 (Skill 호출 전)
+### Step 3-1: `${DEV_DIR}/pr-context.md` 조립 (Skill 호출 전)
 
-오케스트레이터가 아래 내용을 `.dev/pr-context.md`에 Write한다:
+오케스트레이터가 아래 내용을 `${DEV_DIR}/pr-context.md`에 Write한다:
 
 1. **비즈니스 맥락**: PRD의 "배경"과 "요구사항", 설계서의 "배경 및 목적". `--hotfix`이면 ARGS[0]을 사용.
-2. **Trust Ledger 요약**: `.dev/trust-ledger.md`가 존재하면 Read하여 아래 형식으로 포함한다:
+2. **Trust Ledger 요약**: `${DEV_DIR}/trust-ledger.md`가 존재하면 Read하여 아래 형식으로 포함한다:
    ```
    ## Audit Summary
    - 총 N건 (CRITICAL: n, HIGH: n, MEDIUM: n)
@@ -61,8 +61,8 @@ test 스킬이 `.dev/prd.md`를 자동 감지하여 수용 기준(AC)을 테스�
 
 ### Step 3-2: `Skill("ttutak:pull-request")` 호출
 
-`.dev/pr-context.md` 조립이 완료된 후 `Skill("ttutak:pull-request")`를 호출한다.
-pull-request 스킬이 `.dev/pr-context.md`를 자동 감지하여 PR 본문에 반영한다.
+`${DEV_DIR}/pr-context.md` 조립이 완료된 후 `Skill("ttutak:pull-request")`를 호출한다.
+pull-request 스킬이 `${DEV_DIR}/pr-context.md`를 자동 감지하여 PR 본문에 반영한다.
 
 ### Step 3-3: 후속 처리
 
@@ -101,7 +101,7 @@ PRD와 설계서에서 context 갱신 후보를 추출하여 사용자에게 제
 **임의 반영 금지**: 사용자 승인 없이 context 문서를 수정하지 않는다.
 
 ## Step 6: 진행 상태 완료
-`.dev/state.md`의 `status`를 `completed`, `phases.complete`를 `completed`로 갱신한다.
+`${DEV_DIR}/state.md`의 `status`를 `completed`, `phases.complete`를 `completed`로 갱신한다.
 
 ## Step 7: 다음 단계
 

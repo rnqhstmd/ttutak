@@ -4,7 +4,7 @@
 
 ## 각 반복 (1~2회)
 
-**Step 0**: `${PROJECT_ROOT}/.dev/prd.md`를 Read하여 확정된 PRD를 로드한다.
+**Step 0**: `${PROJECT_ROOT}/${DEV_DIR}/prd.md`를 Read하여 확정된 PRD를 로드한다.
 
 **Task**: architect agent를 호출한다 (설계).
 `Task(subagent_type="architect")` — prompt에 다음을 포함:
@@ -66,7 +66,7 @@ design-critic 결과 처리:
 
 **2회 반복 후**: 최신 설계로 phase-implement를 진행한다. 미해결 질문이 있으면 기록한다.
 
-**Phase 완료 후 저장**: 확정된 설계 문서를 `${PROJECT_ROOT}/.dev/design.md`에 Write한다.
+**Phase 완료 후 저장**: 확정된 설계 문서를 `${PROJECT_ROOT}/${DEV_DIR}/design.md`에 Write한다.
 
 **Phase 완료 보고 (요약 모드)**:
 설계서 저장 후 사용자에게 **요약만** 출력한다 (Step 1에서 이미 전문을 표시했으므로 반복하지 않음):
@@ -74,6 +74,6 @@ design-critic 결과 처리:
 설계 확정: <제목>
 - 변경 범위: N개 파일 (신규 N, 수정 N)
 - 구현 순서: N단계
-- 저장: .dev/design.md
+- 저장: ${DEV_DIR}/design.md
 ```
 이후 Phase에서 설계서가 필요하면 파일을 Read하여 Agent prompt에 포함한다.
