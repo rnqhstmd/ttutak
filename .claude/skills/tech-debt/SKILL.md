@@ -95,7 +95,7 @@ allowed-tools:
 ## 공유 상수
 
 - `SOURCE_EXTENSIONS`: `"*.{kt,java,ts,tsx,js,jsx,py,go,rs,swift}"`
-- `EXCLUDE_PATHS`: `build/, out/, dist/, target/, .gradle/, node_modules/, .dev/`
+- `EXCLUDE_PATHS`: `build/, out/, dist/, target/, .gradle/, node_modules/, .dev/, venv/, .venv/, __pycache__/`
 
 Agent 프롬프트에 위 상수를 포함하여 빌드 산출물과 의존성 디렉토리를 탐색 대상에서 제외한다.
 
@@ -211,7 +211,7 @@ Step 1의 결과를 종합하여 우선순위를 매긴다.
 | 수정 용이성 | 30% | 소(3점, Quick Win) > 중(2점) > 대(1점) |
 | 영향 범위 | 30% | 광범위(3점) > 제한적(2점) > 국소적(1점) |
 
-- 점수 = 심각도×0.4 + 수정비용×0.3 + 영향범위×0.3
+- 점수 = 심각도×0.4 + 수정 용이성×0.3 + 영향범위×0.3
 - 점수 높은 순으로 정렬한다.
 
 ### 전체 점수 (Health Score)
