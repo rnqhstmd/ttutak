@@ -419,8 +419,8 @@
 
 <!-- Hero -->
 <div class="hero">
-  <h1>ttutak 뚝딱</h1>
-  <p>"개발해줘" 한마디면 PRD, 설계, 구현, 리뷰, 테스트, PR까지 뚝딱. 말하면 만들어주는 Claude Code 개발 자동화 플러그인</p>
+  <h1>ttutak</h1>
+  <p>PRD, 설계, 구현, 리뷰, PR까지 처리하는 개발 자동화 플러그인</p>
   <div class="hero-badges">
     <a href="https://github.com/rnqhstmd/ttutak" class="btn-primary">GitHub</a>
     <a href="https://github.com/rnqhstmd/ttutak/releases/latest" class="btn-outline">릴리스 노트</a>
@@ -436,6 +436,7 @@
     <a href="#context-skill">context</a>
     <a href="#dev-pipeline">dev</a>
     <a href="#lens-skill">lens</a>
+    <a href="#tech-debt-skill">tech-debt</a>
     <a href="#research-skill">research</a>
     <a href="#humanizer-skill">humanizer</a>
     <a href="#test-skill">test</a>
@@ -522,6 +523,12 @@
           <td>코드에서 비즈니스 정책 추출</td>
           <td>Explore + architect + security-auditor</td>
           <td>요약, 상세, 영향도분석</td>
+        </tr>
+        <tr>
+          <td><a href="#tech-debt-skill"><strong>tech-debt</strong></a></td>
+          <td>기술 부채 분석 + 우선순위 로드맵</td>
+          <td>Explore (병렬)</td>
+          <td>--type code|arch|deps|test|all</td>
         </tr>
         <tr>
           <td><a href="#research-skill"><strong>research</strong></a></td>
@@ -1095,6 +1102,50 @@ references/
         <tr><td>결론</td><td>"혁신적인 변화를 가져올 것입니다"</td><td>삭제. 기능 나열로 충분</td></tr>
         <tr><td>톤</td><td>격식체 + 과장 ("있어서", "뿐만 아니라")</td><td>건조한 설명문 ("만들었고", "쓸 수 있다")</td></tr>
         <tr><td>정보 밀도</td><td>수식어가 내용보다 많음</td><td>2문장에 기능·구조·대상 스택 모두 포함</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Tech Debt -->
+  <section id="tech-debt-skill">
+    <h2>tech-debt — 기술 부채 분석</h2>
+
+    <p>코드베이스의 기술 부채를 유형별로 분석하고, 심각도와 수정 용이성을 기반으로 우선순위 로드맵을 제공합니다. 코드를 수정하지 않는 읽기 전용 스킬이며, 프로젝트 타입에 무관하게 동작합니다.</p>
+
+    <h3>사용 예시</h3>
+    <pre><code>"기술 부채 분석해줘"                    ← 프로젝트 전체 분석
+"결제 도메인 부채 분석해줘"              ← 특정 도메인만
+"아키텍처 부채만 확인해줘 --type arch"   ← 유형 선택
+"의존성 점검해줘 --type deps"           ← 의존성만 분석</code></pre>
+
+    <h3>분석 유형 (4가지)</h3>
+    <table>
+      <thead><tr><th>유형</th><th>감지 대상</th></tr></thead>
+      <tbody>
+        <tr><td><strong>코드</strong> (code)</td><td>중복 코드, 복잡도(God 클래스), dead code, 네이밍 불일치</td></tr>
+        <tr><td><strong>아키텍처</strong> (arch)</td><td>순환 의존성, 레이어 위반, 책임 분리 위반, 매직 넘버 산재</td></tr>
+        <tr><td><strong>의존성</strong> (deps)</td><td>EOL 프레임워크, 보안 취약점, 미고정 버전 (Java/Node/Python)</td></tr>
+        <tr><td><strong>테스트</strong> (test)</td><td>커버리지 부족, 핵심 로직 미검증, assertion 없는 테스트</td></tr>
+      </tbody>
+    </table>
+
+    <h3>보고서 출력</h3>
+    <p>Health Score(A~F 등급, 100점 만점)와 우선순위 로드맵을 제공합니다. Quick Win(수정 비용 낮고 심각도 높은 항목)이 상위에 배치됩니다.</p>
+    <pre><code>건강 점수: B (78/100)
+CRITICAL: 1건 | HIGH: 3건 | MEDIUM: 5건
+
+| # | 유형       | 위치              | 심각도   | 설명                    |
+|---|-----------|------------------|---------|------------------------|
+| 1 | 아키텍처   | service/          | CRITICAL | 순환 의존성 A↔B         |
+| 2 | 의존성     | build.gradle      | HIGH     | Spring Boot 2.x EOL    |
+| 3 | 코드       | PaymentService.kt | HIGH     | 350줄, God 클래스       |</code></pre>
+
+    <h3>lens와의 차이</h3>
+    <table>
+      <thead><tr><th>질문</th><th>스킬</th><th>대상</th></tr></thead>
+      <tbody>
+        <tr><td>"이 정책 바꾸면 어디 영향?"</td><td><strong>lens</strong></td><td>PO / PD</td></tr>
+        <tr><td>"코드 어디가 아프고 뭘 먼저 고쳐?"</td><td><strong>tech-debt</strong></td><td>개발자 / 테크리드</td></tr>
       </tbody>
     </table>
   </section>
