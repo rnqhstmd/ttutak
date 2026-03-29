@@ -42,6 +42,7 @@
 | ".dev/prd.md AI 흔적 교정해줘" | humanizer |
 | "클라우드 네이티브 트렌드 조사해줘" | research |
 | "테스트 작성해줘" | test |
+| "기술 부채 분석해줘" | tech-debt |
 | "커밋해줘" | commit |
 | "PR 만들어줘" | pull-request |
 
@@ -117,8 +118,9 @@ references/
 | 제품책임자(PO) | 요구사항 구체화, PRD 작성, 인수 검증 | requirements, complete |
 | 설계자 | 기술 설계 (변경 범위, API, 구현 순서) | design |
 | 설계 비판자 | 암묵적 가정 도전, 과잉 설계 식별 | design (중형 이상) |
-| 개발자 | 설계 기반 코드 구현, 테스트 작성 | implement, complete |
-| QA 매니저 | 코드 리뷰 + 스펙 충족 검증 | implement, review |
+| 개발자 | 설계 기반 코드 구현 | implement |
+| test 스킬 | 자기점검 후 테스트 작성 | implement |
+| QA 매니저 | 코드 리뷰 + 스펙 충족 검증 (코드+테스트 함께) | implement, review |
 | 보안 감사자 | 정책/보안/허점 교차 검증 | review |
 
 ### humanizer
@@ -160,6 +162,25 @@ PRD나 설계 문서에서 AI 글쓰기 패턴(40+가지)을 감지하고 교정
 - **E2E 테스트**: `interfaces.api/{도메인}/{Controller}E2ETest` — API 엔드포인트
 
 test 스킬은 프로젝트 타입에 맞는 테스트 루트 경로를 자동 감지합니다 (예: Java는 `src/test`, JS/TS는 `__tests__` 또는 `*.test.*`). dev 파이프라인에서는 커밋 전에 자동 호출되고, hotfix 모드에서는 건너뜁니다.
+
+### tech-debt
+
+코드베이스의 기술 부채를 유형별로 분석하고, 우선순위 로드맵을 제공합니다. 코드를 수정하지 않는 읽기 전용 스킬입니다. 프로젝트 타입(Java, Node, Python)을 자동 감지하며, 어떤 프로젝트에서든 코드/아키텍처 분석은 동작합니다.
+
+```
+"기술 부채 분석해줘"                    ← 프로젝트 전체 분석
+"결제 도메인 부채 분석해줘"              ← 특정 도메인만
+"아키텍처 부채만 확인해줘 --type arch"   ← 유형 선택 (code, arch, deps, test)
+"의존성 점검해줘 --type deps"           ← 의존성만 분석
+```
+
+분석 유형:
+- **코드 부채**: 중복 코드, 복잡도(God 클래스), dead code, 네이밍 불일치
+- **아키텍처 부채**: 순환 의존성, 레이어 위반, 책임 분리 위반
+- **의존성 부채**: EOL 프레임워크, 보안 취약점, 미고정 버전
+- **테스트 부채**: 커버리지 부족, 핵심 로직 미검증, assertion 없는 테스트
+
+결과는 Health Score(A~F 등급)와 우선순위 로드맵으로 제공됩니다. `context/`가 등록되어 있으면 의도된 아키텍처와 실제 구조를 비교하여 더 정확한 진단이 가능합니다.
 
 ### commit / pull-request
 
