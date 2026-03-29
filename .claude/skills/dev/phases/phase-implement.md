@@ -1,4 +1,4 @@
-# phase-implement: 구현 + 자기점검
+# phase-implement: 구현 + 자기점검 + 테스트 작성
 
 ## Hotfix 모드 분기
 
@@ -199,6 +199,19 @@ Agent가 설계에서 벗어난 판단을 했다면 해당 내용을 특이사�
 - Warning/Info: N건 (phase-review로 이월)
 - QUESTION: N건 (phase-review로 이월)
 ```
+이후 테스트 작성으로 진행.
+
+## 테스트 작성
+
+**Step 7**: `Skill("ttutak:test")`를 호출하여 구현된 코드에 대한 테스트를 작성한다.
+
+test 스킬이 `${DEV_DIR}/prd.md`를 자동 감지하여 수용 기준(AC)을 테스트 케이스로 변환한다.
+test 스킬 내부의 프로젝트 타입 가드가 지원하지 않는 프로젝트를 자동으로 판별하고 건너뛴다. implement 페이즈에서 프로젝트 타입을 별도로 분기하지 않는다.
+
+**건너뛰기 조건**: `--hotfix` 모드이면 이 단계를 건너뛴다.
+
+`current-step`을 `"테스트 작성"`으로 설정한다.
+
 이후 phase-review로 진행.
 
 ## state.md 추적
@@ -211,7 +224,9 @@ steps:
     - 배치 구성: completed
     - coder 구현 (B1, 2단계 병렬): completed
     - 빌드 검증 (B1): completed
-    - coder 구현 (B2, 1단계): in_progress
+    - coder 구현 (B2, 1단계): completed
+    - 자기점검: completed
+    - 테스트 작성: in_progress
 ```
 
 `execution-log`에도 배치 정보를 기록한다:
@@ -227,3 +242,4 @@ steps:
 - `"배치 구성"` → Step 1.5부터 재실행
 - `"coder 구현 (B2)"` → B1 결과는 파일에 반영됨. `execution-log`에서 이전 배치 결과 복원 후 B2부터 재개
 - `"자기점검"` → Step 4(변경사항 수집)부터 재실행
+- `"테스트 작성"` → Step 7(test 스킬 호출)부터 재실행

@@ -141,16 +141,16 @@ ARGS[0]이 없고 모드도 판정되지 않으면 다음을 응답:
 | setup | 작업환경 준비 | (inline) | No |
 | requirements | PRD Q&A | product-owner | Yes (max 1) |
 | design | 설계 Q&A | architect + design-critic (선택적) | Yes (max 2) |
-| implement | 구현 + 자기점검 | coder + qa-manager | Self-check (1회) |
+| implement | 구현 + 자기점검 + 테스트 | coder + qa-manager + test 스킬 | Self-check (1회) |
 | review | 검토 + 감사 | qa-manager + security-auditor (병렬) | Yes (max 2) |
-| complete | 완료 | product-owner (인수) + test 스킬 + commit/PR 스킬 | 인수 재시도 (max 1) |
+| complete | 완료 | product-owner (인수) + commit/PR 스킬 | 인수 재시도 (max 1) |
 
 ### Hotfix 경로 (`--hotfix`)
 
 긴급 버그 수정용 경량 경로. 설계/리뷰를 건너뛰지만, **경량 PRD와 인수 검증은 실행**한다:
 ```
---hotfix: setup → requirements (경량) → implement → complete (인수검증 포함)
-정상:     setup → requirements → design → implement → review → complete (test → commit → PR)
+--hotfix: setup → requirements (경량) → implement (test 생략) → complete (인수검증 포함)
+정상:     setup → requirements → design → implement (test 포함) → review → complete (commit → PR)
 ```
 - requirements: product-owner가 소형 PRD를 작성한다 (배경 + 요구사항 + 수용 기준만).
 - design: 건너뛴다. coder가 PRD와 코드 맵을 기반으로 직접 구현한다.

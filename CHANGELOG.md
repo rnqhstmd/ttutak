@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.3 (2026-03-29) — test 스킬 호출 위치 개선
+
+### Fixes
+- **dev 파이프라인 test 호출 위치 이동**: phase-complete → phase-implement로 이동하여 리뷰가 테스트 코드까지 포함하도록 개선
+- **자기점검 후 테스트 작성**: 자기점검으로 Critical 수정 완료 후 깨끗한 코드 기준으로 테스트 작성
+- **state.md 추적**: implement 단계에 자기점검/테스트 작성 항목 추가, --resume 호환
+
 ## v1.1.2 (2026-03-25) — dev 산출물 브랜치별 분리 + test 스킬 Spring 전용화
 
 ### Fixes
