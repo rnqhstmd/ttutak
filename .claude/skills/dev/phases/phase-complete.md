@@ -21,7 +21,7 @@ PRD가 있으면 (`${DEV_DIR}/prd.md`), product-owner에게 인수 검증을 요
   - 수정 선택 → coder로 수정 후 인수 검증 1회 재실행.
   - 건너뛰기 선택 → 다음 단계 진행.
 
-위 Step 0 진입 조건에 의해 PRD 부재 또는 `--hotfix` 모드이면 이 단계 전체가 건너뛰어진다.
+위 Step 0 진입 조건에 의해 PRD 부재이면 이 단계 전체가 건너뛰어진다.
 
 ## Step 1: Commit
 

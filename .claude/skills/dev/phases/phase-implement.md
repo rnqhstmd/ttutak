@@ -1,4 +1,4 @@
-# phase-implement: 구현 + 자기점검 + 테스트
+# phase-implement: 구현 + 자기점검 + 테스트 작성
 
 ## Hotfix 모드 분기
 
