@@ -71,7 +71,8 @@ allowed-tools:
 ### 0-1: 프로젝트 루트 및 타입 감지
 
 1. `git rev-parse --show-toplevel`로 프로젝트 루트 확인.
-2. 빌드/설정 파일로 프로젝트 타입을 감지한다:
+2. `.claude/config.json`의 `projectTypes.detect` 설정을 기준으로 프로젝트 타입을 우선 감지한다 (commit/test/dev 스킬과 동일한 방식).
+3. config에서 타입을 판단할 수 없는 경우에만 빌드/설정 파일을 추가 단서로 사용한다:
    - `build.gradle.kts` / `build.gradle` → java/kotlin
    - `package.json` → node
    - `requirements.txt` / `pyproject.toml` → python
@@ -169,14 +170,14 @@ ANALYSIS_TYPE에 따라 해당 유형만 실행하거나, `all`이면 전체 실
 
 **node:**
 1. `package.json`을 Read하여 의존성 목록을 파악한다.
-2. `npm outdated --json` (`timeout: 30000`)으로 업데이트 가능한 패키지를 확인한다.
-3. `npm audit --json` (`timeout: 30000`)으로 알려진 취약점을 확인한다.
+2. `npm outdated --json` (`timeout: 30000`)으로 업데이트 가능한 패키지를 확인한다. `npm outdated`는 업데이트가 존재하면 non-zero 종료코드를 반환하므로, 종료코드와 무관하게 stdout의 JSON 출력을 우선 파싱한다. stdout가 비어있거나 명령 자체가 실행 불가인 경우에만 분석 실패로 간주한다.
+3. `npm audit --json` (`timeout: 30000`)으로 알려진 취약점을 확인한다. `npm audit`도 취약점 발견 시 non-zero를 반환하므로 동일하게 stdout 기준으로 파싱한다.
 
 **python:**
 1. `requirements.txt` 또는 `pyproject.toml`을 Read한다.
 2. 버전 고정 여부 (pinned vs unpinned)를 확인한다.
-3. `pip list --outdated --format=json` (`timeout: 30000`)으로 업데이트 가능한 패키지를 확인한다.
-4. `pip audit --format=json` (`timeout: 30000`)이 실행 가능하면 알려진 취약점을 확인한다.
+3. `pip list --outdated --format=json` (`timeout: 30000`)으로 업데이트 가능한 패키지를 확인한다. non-zero 종료코드 시에도 stdout JSON을 우선 파싱한다.
+4. `pip audit --format=json` (`timeout: 30000`)이 실행 가능하면 알려진 취약점을 확인한다. 동일하게 stdout 기준으로 파싱한다.
 
 **범용 (감지 불가):**
 - 이 유형을 건너뛴다.
