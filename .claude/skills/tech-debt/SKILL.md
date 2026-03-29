@@ -18,7 +18,7 @@ allowed-tools:
   - Bash(git diff *)
   - Bash(git branch *)
   # 의존성 확인 (읽기 전용)
-  - Bash(./gradlew dependencies *)
+  - Bash(./gradlew dependencies)
   - Bash(npm outdated *)
   - Bash(npm audit *)
   - Bash(pip list *)
@@ -95,7 +95,7 @@ allowed-tools:
 ## 공유 상수
 
 - `SOURCE_EXTENSIONS`: `"*.{kt,java,ts,tsx,js,jsx,py,go,rs,swift}"`
-- `EXCLUDE_PATHS`: `build/, out/, dist/, target/, .gradle/, node_modules/, .dev/, venv/, .venv/, __pycache__/`
+- `EXCLUDE_PATHS`: `build/, out/, dist/, target/, .gradle/, node_modules/, .dev/, .claude/, .github/, venv/, .venv/, __pycache__/`
 
 Agent 프롬프트에 위 상수를 포함하여 빌드 산출물과 의존성 디렉토리를 탐색 대상에서 제외한다.
 
@@ -253,6 +253,10 @@ Step 1의 결과를 종합하여 우선순위를 매긴다.
 
 #### 테스트 부채 (N건)
 {발견 항목 상세}
+
+Agent 실패로 분석이 불가한 유형은 다음 형식으로 표시한다:
+#### {유형} 부채
+> 분석 불가: {실패 사유}
 ```
 
 상세 섹션에서는 각 항목에 대해:
