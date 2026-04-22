@@ -2,20 +2,34 @@
 # pre-tool-guard.sh 단위 테스트
 # 사용: bash tools/test-pre-tool-guard.sh
 
-set -uo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOOK="$SCRIPT_DIR/.claude/hooks/pre-tool-guard.sh"
 
-if [ ! -x "$HOOK" ] && [ ! -f "$HOOK" ]; then
+require_command() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "FAIL: 필수 명령을 찾을 수 없습니다: $cmd"
+    exit 1
+  fi
+}
+
+if [ ! -f "$HOOK" ]; then
   echo "FAIL: 훅 스크립트를 찾을 수 없습니다: $HOOK"
   exit 1
 fi
 
+require_command bash
+require_command git
+require_command grep
+require_command mktemp
+require_command jq
+
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# 테스트용 git 저장소 3개 준비: (1) main 브랜치, (2) feat/test 브랜치, (3) detached HEAD
+# 테스트용 git 저장소 준비: (1) main, (2) feat/test, (3) detached HEAD
 init_repo() {
   local dir="$1"
   local branch="$2"
@@ -50,6 +64,7 @@ FAIL=0
 FAILED_CASES=()
 
 # run_case <이름> <기대(allow|deny)> <CWD> <command>
+#   JSON 입력 생성은 jq -Rn으로 안전하게 escape한다 (python3 의존 제거).
 run_case() {
   local name="$1"
   local expected="$2"
@@ -57,10 +72,10 @@ run_case() {
   local cmd="$4"
 
   local input
-  input=$(printf '{"tool_input":{"command":%s}}' "$(printf '%s' "$cmd" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || printf '"%s"' "$cmd")")
+  input=$(jq -Rn --arg c "$cmd" '{tool_input: {command: $c}}')
 
   local output
-  output=$(cd "$cwd" && printf '%s' "$input" | bash "$HOOK" 2>/dev/null)
+  output=$(cd "$cwd" && printf '%s' "$input" | bash "$HOOK" 2>/dev/null || true)
 
   local actual="allow"
   if printf '%s' "$output" | grep -q '"permissionDecision"[[:space:]]*:[[:space:]]*"deny"'; then
@@ -80,50 +95,51 @@ run_case() {
 
 echo "=== pre-tool-guard.sh 단위 테스트 ==="
 
-# (a) main 브랜치에서 `git commit` → deny
+# 기본 커버리지
 run_case "a. main 브랜치 git commit 차단" \
   "deny" "$REPO_MAIN" "git commit -m msg"
 
-# (b) 작업 브랜치(feat/test)에서 `git commit` → allow
 run_case "b. 작업 브랜치 git commit 허용" \
   "allow" "$REPO_FEAT" "git commit -m msg"
 
-# (c) detached HEAD에서 `git commit` → deny
 run_case "c. detached HEAD git commit 차단" \
   "deny" "$REPO_DETACHED" "git commit -m msg"
 
-# (d) false positive — git commit 단어가 substring으로 들어있지만 단독이 아님
 run_case "d. git commitstats (false positive 방지)" \
   "allow" "$REPO_MAIN" "echo git commitstats"
 
-# (e) `git -C <path>` 로 다른 저장소 지정 (main) → deny
 run_case "e. git -C <main repo> commit 차단" \
   "deny" "$REPO_FEAT" "git -C $REPO_MAIN commit -m msg"
 
-# (f) 비-git 명령 → allow
 run_case "f. 비-git 명령 허용" \
   "allow" "$REPO_MAIN" "ls -la"
 
-# 추가: (g) `git -C` 로 작업 브랜치 저장소 지정 (feat) → allow
 run_case "g. git -C <feat repo> commit 허용" \
   "allow" "$REPO_MAIN" "git -C $REPO_FEAT commit -m msg"
 
-# 추가: (h) git push → allow (훅은 commit만 가드)
 run_case "h. git push 허용" \
   "allow" "$REPO_MAIN" "git push origin main"
 
-# 추가: (i) main에서 `git --no-pager commit` — 중간 옵션이 있어도 가드해야 함
+# 중간 옵션 대응
 run_case "i. git --no-pager commit 차단 (중간 옵션)" \
   "deny" "$REPO_MAIN" "git --no-pager commit -m msg"
 
-# 추가: (j) 작업 브랜치에서 `git --git-dir=... commit` — 중간 옵션 + 허용 경로
 run_case "j. git --git-dir=... commit 허용" \
   "allow" "$REPO_FEAT" "git --git-dir=/tmp/x.git --work-tree=/tmp commit -m msg"
 
-# 추가: (k) "git commit" — JSON 값 내 따옴표 직후 위치 (jq fallback 시뮬레이션)
-#       fallback에서 INPUT 문자열이 그대로 CMD로 들어와 `"command":"git commit ..."` 형태가 됨
-run_case "k. JSON 문자열 fallback (\" 접두사) 차단" \
-  "deny" "$REPO_MAIN" 'command":"git commit -m msg"'
+# 접미사 `"` 대응 (fallback 모드 시뮬레이션)
+run_case "k. 세그먼트 말미가 \" (fallback 경계) 차단" \
+  "deny" "$REPO_MAIN" 'git commit'
+
+# 복합 명령: 각 세그먼트를 독립적으로 가드해야 함
+run_case "l. 복합명령 - 첫 세그먼트 main 차단" \
+  "deny" "$REPO_FEAT" "git -C $REPO_MAIN commit -m a; git -C $REPO_FEAT commit -m b"
+
+run_case "m. 복합명령 - 두번째 세그먼트 main 차단" \
+  "deny" "$REPO_FEAT" "git -C $REPO_FEAT commit -m a && git -C $REPO_MAIN commit -m b"
+
+run_case "n. 복합명령 - 양쪽 모두 feat 허용" \
+  "allow" "$REPO_MAIN" "git -C $REPO_FEAT commit -m a && git -C $REPO_FEAT commit -m b"
 
 echo
 echo "=== 결과: PASS=$PASS, FAIL=$FAIL ==="

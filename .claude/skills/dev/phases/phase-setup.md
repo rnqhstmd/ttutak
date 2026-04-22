@@ -27,8 +27,9 @@ state.md를 재개하기 전에 외부 개입으로 인한 불일치를 감지�
 1. **브랜치 정합성**: state.md의 `branch` 필드와 `git branch --show-current` 결과를 비교한다. 불일치 시 AskUserQuestion을 띄운다:
    - "기존 `.dev/{state.md의 branch}/`를 현재 브랜치(`{현재 브랜치}`)로 이관" → 이관 실행.
      - 이관 전에 목적지 `.dev/{new-slug}/`가 이미 존재하는지 확인한다. **존재 시 `mv`를 사용하지 않는다** (목적지 내부로 중첩 이동되어 구조가 깨진다).
-     - 존재하지 않으면: `mv .dev/{old-slug} .dev/{new-slug}`.
-     - 존재하면: 추가 AskUserQuestion — ①"기존 `.dev/{new-slug}/`를 `.dev/{new-slug}.backup-$(date +%s)/`로 백업 후 이관" / ②"중단". 백업 선택 시 `mv .dev/{new-slug} .dev/{new-slug}.backup-$(date +%s)` → `mv .dev/{old-slug} .dev/{new-slug}` 순서로 실행.
+     - 존재하지 않으면: `mv ".dev/{old-slug}" ".dev/{new-slug}"`.
+     - 존재하면: 추가 AskUserQuestion — ①"기존 `.dev/{new-slug}/`를 `.dev/{new-slug}.backup-$(date +%s)/`로 백업 후 이관" / ②"중단". 백업 선택 시 `mv ".dev/{new-slug}" ".dev/{new-slug}.backup-$(date +%s)"` → `mv ".dev/{old-slug}" ".dev/{new-slug}"` 순서로 실행.
+     - 경로에 공백/특수문자가 포함될 수 있으므로 `mv` 인자는 반드시 따옴표로 감싼다.
    - "새로 시작" → 기존 `.dev/{old-slug}/`는 유지하고 Step 1로 진행.
    - "중단" → 사용자에게 수동 정리를 요청하고 종료.
 2. **HEAD 정합성**: state.md에 `last-known-head` 필드가 있고 현재 `git rev-parse HEAD`와 다르면, `git log {last-known-head}..HEAD --oneline`으로 외부 커밋 개수를 센다. 1개 이상이면 사용자에게 보고: "외부 커밋 {N}건이 감지되었습니다: {sha1}..{sha2}. 계속하시려면 확인해주세요." 후 AskUserQuestion으로 진행/중단 선택.

@@ -24,10 +24,15 @@ jobs:
 
       - name: Verify version parity
         run: |
+          PN=$(jq -r '.name' .claude-plugin/plugin.json)
           PV=$(jq -r '.version' .claude-plugin/plugin.json)
-          MV=$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)
+          MV=$(jq -r --arg name "$PN" '.plugins[] | select(.name == $name) | .version' .claude-plugin/marketplace.json)
+          if [ -z "$MV" ] || [ "$MV" = "null" ]; then
+            echo "::error::marketplace.json missing plugin entry for name=$PN"
+            exit 1
+          fi
           if [ "$PV" != "$MV" ]; then
-            echo "::error::version mismatch: plugin.json=$PV marketplace.json=$MV"
+            echo "::error::version mismatch for plugin $PN: plugin.json=$PV marketplace.json=$MV"
             exit 1
           fi
           if ! grep -q "^## v$PV" CHANGELOG.md; then

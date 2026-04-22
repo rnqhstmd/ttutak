@@ -15,7 +15,7 @@
 ### Enhancements
 - **Hotfix 경량 보안 감사**: `--hotfix` 모드에 phase-implement 자기점검 이후 security-auditor 호출 단계 추가 (CRITICAL/HIGH만 보고). 결과를 Trust Ledger `### Hotfix 긴급 감사` 섹션에 기록하고 PR 본문의 Audit Summary에 반영
 - **`tools/bump-version.sh`**: `plugin.json` / `marketplace.json` 버전 일괄 갱신 스크립트 추가. SemVer 검증 및 CHANGELOG 섹션 유무 경고 포함
-- **`tools/test-pre-tool-guard.sh`**: pre-tool-guard 훅 단위 테스트(8개 케이스) 추가
+- **`tools/test-pre-tool-guard.sh`**: pre-tool-guard 훅 단위 테스트(14개 케이스, 복합 명령 우회 검증 포함) 추가
 
 ## v1.2.0 (2026-03-29) — tech-debt 스킬 추가 + test 호출 위치 개선
 
