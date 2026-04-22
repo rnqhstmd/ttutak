@@ -22,6 +22,19 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Verify version parity
+        run: |
+          PV=$(jq -r '.version' .claude-plugin/plugin.json)
+          MV=$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)
+          if [ "$PV" != "$MV" ]; then
+            echo "::error::version mismatch: plugin.json=$PV marketplace.json=$MV"
+            exit 1
+          fi
+          if ! grep -q "^## v$PV" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md missing '## v$PV' section"
+            exit 1
+          fi
+
       - name: Check if tag already exists
         id: check_tag
         run: |

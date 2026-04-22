@@ -48,6 +48,8 @@ PRD가 있으면 (`${DEV_DIR}/prd.md`), product-owner에게 인수 검증을 요
    ```
    Trust Ledger가 없으면 이 섹션을 생략한다.
 
+   **Hotfix 감사 병기**: Trust Ledger에 `### Hotfix 긴급 감사` 섹션이 포함되어 있으면, `## Audit Summary` 블록 끝에 `- hotfix 감사: CRITICAL n건, HIGH n건 (자세한 내용은 Trust Ledger 참조)` 한 줄을 추가한다. 정상 플로우와 hotfix 모두 동일한 Audit Summary 포맷을 사용하여 PR 본문의 일관성을 유지한다.
+
 ### Step 2-2: `Skill("ttutak:pull-request")` 호출
 
 `${DEV_DIR}/pr-context.md` 조립이 완료된 후 `Skill("ttutak:pull-request")`를 호출한다.

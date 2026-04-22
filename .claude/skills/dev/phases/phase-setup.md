@@ -20,6 +20,16 @@ ARGS[0]이 없으면 → 아래 자동 감지 로직 실행.
      - "새로 시작" → Step 1로 진행 (Step 7에서 덮어씀)
 3. state.md가 없거나 `status: completed`이면 → Step 1로 진행.
 
+### 0.1 재개 정합성 체크 (이어서 진행 선택 시)
+
+state.md를 재개하기 전에 외부 개입으로 인한 불일치를 감지한다.
+
+1. **브랜치 정합성**: state.md의 `branch` 필드와 `git branch --show-current` 결과를 비교한다. 불일치 시 AskUserQuestion을 띄운다:
+   - "기존 `.dev/{state.md의 branch}/`를 현재 브랜치(`{현재 브랜치}`)로 이관" → `mv .dev/{old-slug} .dev/{new-slug}` 실행 후 재개.
+   - "새로 시작" → 기존 `.dev/{old-slug}/`는 유지하고 Step 1로 진행.
+   - "중단" → 사용자에게 수동 정리를 요청하고 종료.
+2. **HEAD 정합성**: state.md에 `last-known-head` 필드가 있고 현재 `git rev-parse HEAD`와 다르면, `git log {last-known-head}..HEAD --oneline`으로 외부 커밋 개수를 센다. 1개 이상이면 사용자에게 보고: "외부 커밋 {N}건이 감지되었습니다: {sha1}..{sha2}. 계속하시려면 확인해주세요." 후 AskUserQuestion으로 진행/중단 선택.
+
 **이어서 진행 시:**
 - state.md에서 GIT_PREFIX, PROJECT_ROOT, 베이스 브랜치, 프로젝트 타입, ARGS[0], flags를 복원.
 - `test -d`로 경로 검증. 실패 시 "작업 경로가 유효하지 않습니다." → 새로 시작.
@@ -38,13 +48,48 @@ ARGS[0]이 없으면 → 아래 자동 감지 로직 실행.
 ## Step 2: 베이스 브랜치 결정
 공유 규칙의 "베이스 브랜치 감지"에 따라 결정한다.
 
-결정 후 베이스 브랜치를 최신 상태로 동기화한다:
-1. `git remote get-url origin`으로 remote 존재를 확인한다. 없으면 건너뛴다.
-2. `git checkout <base-branch>`를 실행한다. 실패 시 경고를 표시하고 현재 로컬 상태로 계속 진행한다.
+결정 후 베이스 브랜치를 최신 상태로 동기화한다. **작업 중 변경사항은 자동 stash로 보호한다.**
+
+### 2.1 자동 stash 보호
+
+`git checkout`/`git pull` 전에 워킹 디렉토리의 미커밋 변경을 보존한다.
+
+1. `git status --porcelain` 실행. 결과가 비어 있지 않으면 미커밋 변경이 존재한다.
+2. 변경이 있으면:
+   - `STASH_REF=$(git stash create 2>/dev/null)` 후 `git stash store -m "ttutak-dev-auto-$(date +%s)" "$STASH_REF"` 로 보관. (create+store 조합으로 conflict 방지)
+   - 또는 간단히 `git stash push -u -m "ttutak-dev-auto-$(date +%s)"`.
+   - 변수 `AUTO_STASHED=true`로 기록하고 stash ref를 state.md `execution-log`의 `auto-stash: <ref>` 엔트리에 저장한다.
+3. 변경이 없으면 `AUTO_STASHED=false`.
+
+### 2.2 베이스 브랜치 동기화
+
+1. `git remote get-url origin`으로 remote 존재를 확인한다. 없으면 pull 단계만 건너뛴다.
+2. `git checkout <base-branch>`를 실행한다. 실패 시 경고를 표시하고 2.3으로 진행한다.
 3. checkout 성공 시, `git pull origin <base-branch>`를 실행한다. pull 실패 시 (네트워크 오류 등) 경고를 표시하고 현재 로컬 상태로 계속 진행한다.
+
+### 2.3 stash 복원
+
+Step 5 (작업 브랜치 생성)가 완료된 후에만 stash를 복원한다. 그 전에 복원하면 베이스 브랜치로 변경이 섞일 수 있다.
+
+1. `AUTO_STASHED=true`이면 **Step 5 종료 시점**에 `git stash pop` 실행.
+2. pop 충돌 발생 시 사용자에게 보고하고 AskUserQuestion:
+   - "stash를 유지하고 수동 해결" → conflict 상태를 유지한 채 파이프라인 일시 중단. 사용자가 해결 후 재개 지시.
+   - "stash를 drop하고 계속" → `git stash drop`으로 버리고 다음 단계 진행. 위험 수용을 state.md에 기록.
+3. 복원 성공 시 `AUTO_STASHED=false`로 초기화하고 execution-log에 `auto-stash-restored` 기록.
 
 ## Step 3: 프로젝트 정보 수집
 `PROJECT_ROOT = ./` (현재 디렉토리).
+
+### 3.0 config.json 가드 (필수 선행)
+
+`test -f .claude/config.json`로 존재 여부를 확인한다.
+- **부재 시**: AskUserQuestion — "`.claude/config.json`이 없습니다. `/ttutak:setup`으로 자동 생성할까요?"
+  - "자동 생성" → `Skill("ttutak:setup")`을 호출. 생성 완료 후 다시 3.0을 검증.
+  - "직접 생성 후 재실행" → 파이프라인 중단.
+- **존재 시**: Read하여 `projectTypes`, `sensitiveFilePatterns`, `buildArtifactPatterns`, `timeouts`, `contextLimits`를 변수에 로드.
+- JSON 파싱 실패 시: "config.json이 손상되었습니다. 백업 후 재설정하세요." 출력 후 중단.
+
+### 3.1 병렬 수집
 
 아래 5개 작업은 서로 독립적이므로 **병렬로 실행**한다:
 1. **프로젝트 타입 감지**: `.claude/config.json`의 `projectTypes`에서 detect 필드와 매칭한다 (예: `build.gradle.kts` → `java-spring`, `package.json` → `node`). 여러 타입이 감지되면 모두 기록한다.
@@ -86,6 +131,7 @@ ARGS[0]에서 도메인 키워드를 추출하여 `PROJECT_ROOT` 내에서 관�
   2. **이슈 키가 있으면**: 이슈 키를 브랜치명으로 사용 (e.g., `[JIRA-123] 로그인 기능 추가` → 브랜치 `JIRA-123`)
   3. **이슈 키가 없으면**: 핵심 키워드 추출, 한국어→영어 번역, 최대 40자 (e.g., `로그인 기능 추가` → `login-feature`)
 - `git checkout -b <branch-name>`으로 브랜치를 생성한다. 브랜치가 이미 존재하면 (`already exists` 에러) `git checkout <branch-name>`으로 전환한다.
+- **작업 브랜치 전환 완료 직후 `Step 2.3 stash 복원` 절차를 수행한다** (`AUTO_STASHED=true`인 경우).
 - 완료 후 프로젝트 타입, 브랜치명, 작업 경로를 사용자에게 보고.
 
 ## Step 6: .gitignore 자동 보강
@@ -113,5 +159,6 @@ ARGS[0]에서 도메인 키워드를 추출하여 `PROJECT_ROOT` 내에서 관�
 - phase: setup, status: in_progress
 - branch, base, project-type, project-root, args, flags 기록
 - mode, intent-source 기록 (의도 파싱 결과)
+- **last-known-head**: `git rev-parse HEAD` 결과. 재개 시 외부 커밋 감지에 사용한다. 각 Phase 종료 시 갱신한다.
 - phases: { setup: completed }
 

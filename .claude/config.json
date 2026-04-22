@@ -20,11 +20,20 @@
     }
   },
   "sensitiveFilePatterns": [
-    ".env*",
+    ".env",
+    ".env.*",
     "*.key",
     "*.pem",
-    "credentials*",
-    "*secret*"
+    "credentials.json",
+    "credentials.yaml",
+    "credentials.yml",
+    "*.secret",
+    "*.secret.*",
+    "secrets.json",
+    "secrets.yaml",
+    "secrets.yml",
+    "id_rsa",
+    "id_ed25519"
   ],
   "buildArtifactPatterns": [
     "build/",

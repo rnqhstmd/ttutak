@@ -322,6 +322,7 @@ project-root: ./
 args: "[JIRA-123] 로그인 기능 추가"
 flags: --hotfix
 started: 2026-02-17T10:30:00
+last-known-head: 7c9e814abc...   # 재개 시 외부 커밋 감지에 사용
 current-step: "자기점검"
 phases:
   setup: completed
@@ -359,9 +360,9 @@ execution-log:
 
 **갱신 규칙:**
 - Phase 진입 시: `phase: {name}`, `phases.{name}: in_progress`로 갱신.
-- Phase 완료 시: `phases.{name}: completed`로 갱신.
+- Phase 완료 시: `phases.{name}: completed`로 갱신하고, `last-known-head`를 현재 `git rev-parse HEAD`로 갱신한다.
 - Phase 내 주요 Step 시작/완료 시: `current-step`과 `steps` 갱신.
-- `--resume` 시 `current-step`에서 재개한다 (Phase 처음부터가 아닌 중단 Step부터).
+- `--resume` 시 `current-step`에서 재개한다 (Phase 처음부터가 아닌 중단 Step부터). 재개 전에 phase-setup Step 0.1 정합성 체크(브랜치/HEAD)를 수행한다.
 - 에이전트 호출 완료 시: `execution-log`에 엔트리 추가 (agent명, result 요약).
 - Gate 실행 결과도 `execution-log`에 기록한다.
 - 정체 감지 시: 해당 `execution-log` 엔트리에 `stagnation: {패턴}` 필드를 추가한다.

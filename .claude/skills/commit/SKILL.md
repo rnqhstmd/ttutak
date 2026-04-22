@@ -38,11 +38,19 @@ Arguments:
 
 ## 사전 확인
 
+### Step 0: config 로드 (필수)
+
+- `test -f .claude/config.json`으로 존재 확인.
+- **부재 시**: "`.claude/config.json`이 없습니다. `/ttutak:setup`을 실행하여 초기 설정을 완료하세요." 출력 후 **즉시 종료**.
+- **존재 시**: Read하여 `projectTypes`, `sensitiveFilePatterns`, `buildArtifactPatterns`, `timeouts` 를 변수에 로드. JSON 파싱 실패 시 "config.json이 손상되었습니다." 경고 후 중단.
+
+### Step 1: 기본 검증
+
 - Git 저장소인지 확인
 - **작업 디렉토리 보정**: `git rev-parse --show-toplevel`로 Git 루트를 확인한다. 현재 디렉토리와 다르면 (워크스페이스 root에서 호출된 경우 등), 이후 모든 git/빌드 명령을 Git 루트 기준 서브셸 `(cd <git-root> && <명령>)`로 실행한다.
 - 커밋할 변경사항이 있는지 확인 (없으면: "커밋할 변경사항이 없습니다.")
 - 커밋 전에 빌드를 실행한다:
-  - `.claude/config.json`의 `projectTypes`에서 프로젝트 타입을 감지한다 (빌드/설정 파일 기준).
+  - Step 0에서 로드한 `projectTypes`에서 프로젝트 타입을 감지한다 (빌드/설정 파일 기준).
   - 감지된 프로젝트 타입의 `build` 명령을 실행한다.
   - 빌드 실패 시 커밋을 중단하고 사용자에게 보고.
   - 타임아웃: build Bash 명령에 `timeout: 300000` (5분) 파라미터를 설정한다. 초과 시 해당 단계를 건너뛰고 사용자에게 보고.
@@ -81,7 +89,7 @@ feat: 로그인 기능 추가
 0. `git diff --cached --name-only`로 기존 staged 파일 목록을 캡처한다. (커밋 실패 시 원래 staged 상태를 복원하기 위함)
 1. `git status --short`로 변경 파일 목록을 확인하고, 목록을 사용자에게 표시한다.
 2. 빌드 아티팩트 패턴(`.claude/config.json` → `buildArtifactPatterns` 참조)이 tracked 파일 목록에 있으면: `.gitignore` 파일이 존재하는지 `test -f .gitignore`로 먼저 확인한다. 파일이 존재하면 해당 패턴이 `.gitignore`에 있는지 grep으로 확인하고, 있으면 `git rm -r --cached <pattern>`으로 tracking을 해제한다. `.gitignore`가 없거나 패턴이 없으면 사용자에게 `.gitignore` 생성/추가 여부를 확인한다. **주의: 반드시 `--cached` 플래그를 사용할 것. `--cached` 없이 `git rm`을 실행하면 파일이 삭제된다.**
-3. 민감 파일 패턴(`.claude/config.json` → `sensitiveFilePatterns` 참조)이 목록에 있으면 사용자에게 경고하고 스테이징에서 제외할지 확인한다.
+3. 민감 파일 패턴(`.claude/config.json` → `sensitiveFilePatterns` 참조)이 목록에 있으면 사용자에게 경고하고 스테이징에서 제외할지 확인한다. 패턴은 **파일 basename 기준 glob match**로 평가한다 (예: `*.secret`은 `config.secret`에는 매칭되지만 `secretary.md`에는 매칭되지 않는다).
 4. 변경 파일이 20개를 초과하면 사용자에게 전체 스테이징 여부를 확인한다.
 5. 스테이징:
    - 제외 파일 없음: `git add -A`
