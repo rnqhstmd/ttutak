@@ -112,6 +112,19 @@ run_case "g. git -C <feat repo> commit 허용" \
 run_case "h. git push 허용" \
   "allow" "$REPO_MAIN" "git push origin main"
 
+# 추가: (i) main에서 `git --no-pager commit` — 중간 옵션이 있어도 가드해야 함
+run_case "i. git --no-pager commit 차단 (중간 옵션)" \
+  "deny" "$REPO_MAIN" "git --no-pager commit -m msg"
+
+# 추가: (j) 작업 브랜치에서 `git --git-dir=... commit` — 중간 옵션 + 허용 경로
+run_case "j. git --git-dir=... commit 허용" \
+  "allow" "$REPO_FEAT" "git --git-dir=/tmp/x.git --work-tree=/tmp commit -m msg"
+
+# 추가: (k) "git commit" — JSON 값 내 따옴표 직후 위치 (jq fallback 시뮬레이션)
+#       fallback에서 INPUT 문자열이 그대로 CMD로 들어와 `"command":"git commit ..."` 형태가 됨
+run_case "k. JSON 문자열 fallback (\" 접두사) 차단" \
+  "deny" "$REPO_MAIN" 'command":"git commit -m msg"'
+
 echo
 echo "=== 결과: PASS=$PASS, FAIL=$FAIL ==="
 if [ "$FAIL" -gt 0 ]; then

@@ -23,9 +23,11 @@ if [ -z "$CMD" ]; then
   CMD="$INPUT"
 fi
 
-# 2) `git commit` 단어 경계 매칭 (git commitstats 같은 false positive 제거)
-#    지원: 선두/구분자 뒤의 git, 선택적 -C <path>, 이어지는 commit 단어
-if ! printf '%s' "$CMD" | grep -Eq '(^|[[:space:];&|(])git([[:space:]]+-C[[:space:]]+([^[:space:]]+|"[^"]+"|'"'"'[^'"'"']+'"'"'))?[[:space:]]+commit([[:space:]]|$)'; then
+# 2) `git commit` 단어 경계 매칭
+#    - `git` 앞: 선두, 공백, `;&|(`, 또는 JSON 값 `"` 직후
+#    - `git`과 `commit` 사이: 임의 토큰 허용 (--no-pager, -C <path>, --git-dir=... 등)
+#    - `commit` 뒤: 공백 또는 문자열 끝 (commitstats 같은 substring false positive 제거)
+if ! printf '%s' "$CMD" | grep -Eq '(^|[[:space:];&|("])git([[:space:]]+[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)'; then
   exit 0
 fi
 

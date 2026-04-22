@@ -25,7 +25,10 @@ ARGS[0]이 없으면 → 아래 자동 감지 로직 실행.
 state.md를 재개하기 전에 외부 개입으로 인한 불일치를 감지한다.
 
 1. **브랜치 정합성**: state.md의 `branch` 필드와 `git branch --show-current` 결과를 비교한다. 불일치 시 AskUserQuestion을 띄운다:
-   - "기존 `.dev/{state.md의 branch}/`를 현재 브랜치(`{현재 브랜치}`)로 이관" → `mv .dev/{old-slug} .dev/{new-slug}` 실행 후 재개.
+   - "기존 `.dev/{state.md의 branch}/`를 현재 브랜치(`{현재 브랜치}`)로 이관" → 이관 실행.
+     - 이관 전에 목적지 `.dev/{new-slug}/`가 이미 존재하는지 확인한다. **존재 시 `mv`를 사용하지 않는다** (목적지 내부로 중첩 이동되어 구조가 깨진다).
+     - 존재하지 않으면: `mv .dev/{old-slug} .dev/{new-slug}`.
+     - 존재하면: 추가 AskUserQuestion — ①"기존 `.dev/{new-slug}/`를 `.dev/{new-slug}.backup-$(date +%s)/`로 백업 후 이관" / ②"중단". 백업 선택 시 `mv .dev/{new-slug} .dev/{new-slug}.backup-$(date +%s)` → `mv .dev/{old-slug} .dev/{new-slug}` 순서로 실행.
    - "새로 시작" → 기존 `.dev/{old-slug}/`는 유지하고 Step 1로 진행.
    - "중단" → 사용자에게 수동 정리를 요청하고 종료.
 2. **HEAD 정합성**: state.md에 `last-known-head` 필드가 있고 현재 `git rev-parse HEAD`와 다르면, `git log {last-known-head}..HEAD --oneline`으로 외부 커밋 개수를 센다. 1개 이상이면 사용자에게 보고: "외부 커밋 {N}건이 감지되었습니다: {sha1}..{sha2}. 계속하시려면 확인해주세요." 후 AskUserQuestion으로 진행/중단 선택.
@@ -52,13 +55,13 @@ state.md를 재개하기 전에 외부 개입으로 인한 불일치를 감지�
 
 ### 2.1 자동 stash 보호
 
-`git checkout`/`git pull` 전에 워킹 디렉토리의 미커밋 변경을 보존한다.
+`git checkout`/`git pull` 전에 워킹 디렉토리의 미커밋 변경을 보존하고 워킹 디렉토리를 깨끗하게 비운다.
 
 1. `git status --porcelain` 실행. 결과가 비어 있지 않으면 미커밋 변경이 존재한다.
 2. 변경이 있으면:
-   - `STASH_REF=$(git stash create 2>/dev/null)` 후 `git stash store -m "ttutak-dev-auto-$(date +%s)" "$STASH_REF"` 로 보관. (create+store 조합으로 conflict 방지)
-   - 또는 간단히 `git stash push -u -m "ttutak-dev-auto-$(date +%s)"`.
-   - 변수 `AUTO_STASHED=true`로 기록하고 stash ref를 state.md `execution-log`의 `auto-stash: <ref>` 엔트리에 저장한다.
+   - `git stash push -u -m "ttutak-dev-auto-$(date +%s)"` 실행. `-u` 옵션으로 untracked 파일까지 포함해 워킹 디렉토리를 비우고 변경을 보관한다.
+   - (참고) `git stash create`/`store` 조합은 워킹 디렉토리를 비우지 않으므로 이후 `checkout` 충돌을 유발한다. 반드시 `push -u`만 사용한다.
+   - `AUTO_STASHED=true`로 기록하고 `git stash list` 최상단 ref를 state.md `execution-log`의 `auto-stash: <ref>` 엔트리에 저장한다.
 3. 변경이 없으면 `AUTO_STASHED=false`.
 
 ### 2.2 베이스 브랜치 동기화

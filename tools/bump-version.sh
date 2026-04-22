@@ -41,8 +41,19 @@ done
 jq --arg v "$V" '.version = $v' "$PLUGIN" > "$PLUGIN.tmp"
 mv "$PLUGIN.tmp" "$PLUGIN"
 
-# marketplace.json 갱신 (plugins[0].version)
-jq --arg v "$V" '.plugins[0].version = $v' "$MARKET" > "$MARKET.tmp"
+# marketplace.json 갱신 — plugin.json의 name을 기준으로 필터링 (순서 변경/다중 플러그인 대응)
+PLUGIN_NAME=$(jq -r '.name' "$PLUGIN")
+if [ -z "$PLUGIN_NAME" ] || [ "$PLUGIN_NAME" = "null" ]; then
+  echo "error: plugin.json에 name 필드가 없습니다." >&2
+  exit 1
+fi
+# 해당 name이 marketplace.json에 존재하는지 확인
+HAS_PLUGIN=$(jq --arg name "$PLUGIN_NAME" '[.plugins[]? | select(.name == $name)] | length' "$MARKET")
+if [ "$HAS_PLUGIN" = "0" ]; then
+  echo "error: marketplace.json의 plugins[] 에 name='$PLUGIN_NAME' 항목이 없습니다." >&2
+  exit 1
+fi
+jq --arg v "$V" --arg name "$PLUGIN_NAME" '(.plugins[] | select(.name == $name)).version = $v' "$MARKET" > "$MARKET.tmp"
 mv "$MARKET.tmp" "$MARKET"
 
 echo "✅ plugin.json / marketplace.json → $V"
