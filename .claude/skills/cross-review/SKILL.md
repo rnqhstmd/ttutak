@@ -312,12 +312,12 @@ done >> "${DIFF_FILE}"
   ```
 - **codex advisor**: codex companion은 외부 CLI라 본 세션의 Read 도구를 호출할 수 없다. stat 요약만으로는 실제 코드 변경을 못 보고 정확도가 크게 떨어진다. 따라서 codex 경로에서는 다음 우선순위로 처리한다:
   1. 가능하면 전체 diff를 그대로 전달한다 (`${SCOPE}`가 명시적으로 `stat`이 아니면 500줄 초과여도 전체 유지).
-  2. `${SCOPE}` == `stat`이 명시되었거나 diff가 컨텍스트 한계(예: 50,000줄)를 명백히 초과하면 **핵심 파일 위주 부분 diff**를 만든다:
+  2. `${SCOPE}` == `stat`이 명시되었거나 diff가 컨텍스트 한계(예: 50,000줄)를 명백히 초과하면 **핵심 파일 위주 부분 diff**를 만든다. `--stat`은 사람이 읽기 좋은 형태(파일명·`|`·변경 표시)라 파싱이 까다로우므로 `--numstat`(추가/삭제 라인 수 + 파일명)으로 정렬한다:
      ```bash
-     # stat에서 변경량 큰 상위 N개 파일을 추출하여 부분 diff로 묶는다
-     git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat \
-       | awk 'NF>=3 {print $NF, $(NF-2)}' | sort -k2 -n -r | head -20 \
-       | awk '{print $1}' > "${DEV_DIR}/diff-files.txt"
+     # 변경량(추가+삭제) 상위 N개 파일을 추출하여 부분 diff로 묶는다
+     git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --numstat \
+       | awk '{print $1+$2, $3}' | sort -rn | head -20 \
+       | awk '{print $2}' > "${DEV_DIR}/diff-files.txt"
      git diff "$(git merge-base HEAD "${BASE_BRANCH}")" -- $(cat "${DEV_DIR}/diff-files.txt") > "${DIFF_FILE}"
      git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat >> "${DIFF_FILE}"
      ```
@@ -444,7 +444,7 @@ node "${CODEX_COMPANION}" task --prompt-file "${PROMPT_FILE}" \
 
 **Task A: qa-manager (cross-review 미션)**
 
-`Task(subagent_type="qa-manager")` — prompt에 다음을 포함:
+`Task(subagent_type="ttutak:qa-manager")` — prompt에 다음을 포함:
 
 ```
 [중요] 이 호출은 일반 phase-review가 아닌 cross-review이다.
@@ -473,7 +473,7 @@ node "${CODEX_COMPANION}" task --prompt-file "${PROMPT_FILE}" \
 
 **Task B: security-auditor (cross-review 미션)**
 
-`Task(subagent_type="security-auditor")` — prompt에 다음을 포함:
+`Task(subagent_type="ttutak:security-auditor")` — prompt에 다음을 포함:
 
 ```
 [중요] 이 호출은 일반 review가 아닌 cross-review이다.
@@ -625,7 +625,7 @@ AskUserQuestion(
 
 #### 전부 수정
 
-모든 항목을 한 번에 `Task(subagent_type="coder")` 수정 모드로 위임:
+모든 항목을 한 번에 `Task(subagent_type="ttutak:coder")` 수정 모드로 위임:
 
 prompt:
 - 수정 항목 목록 전체 (각 항목의 위치, 문제, 권고)
@@ -665,7 +665,7 @@ AskUserQuestion(
 )
 ```
 
-승인된 항목만 모아서 `Task(subagent_type="coder")` 수정 모드로 일괄 위임.
+승인된 항목만 모아서 `Task(subagent_type="ttutak:coder")` 수정 모드로 일괄 위임.
 
 #### 직접 입력
 
