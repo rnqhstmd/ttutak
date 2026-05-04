@@ -1,6 +1,9 @@
 # Changelog
 
-## v1.3.0 (2026-05-04) — cross-review 스킬 추가
+## v1.3.0 (2026-05-04) — cross-review 스킬 추가 + agents 디렉토리 표준화
+
+### Fixes
+- **agents 디렉토리 위치 표준화**: 기존 `.claude-plugin/agents/`는 Claude Code 표준에서 벗어난 위치였다. 런타임이 플러그인 루트의 `agents/`만 스캔하므로 `Task(subagent_type="ttutak:coder")` 호출 시 "Agent type not found" 에러가 발생했다. 9개 에이전트 파일을 `agents/`(플러그인 루트)로 이동하여 정상 등록되도록 수정 (Claude Code 공식 문서: "Only `plugin.json` goes inside `.claude-plugin/`. All other directories must be at the plugin root level.").
 
 ### Features
 - **cross-review**: dev 산출물(PRD/설계서/Trust Ledger) 기반 교차 검증 리뷰 스킬 추가
