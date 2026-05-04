@@ -157,12 +157,13 @@ allowed-tools:
 | design | `${DEV_DIR}/design.md` | "변경 범위 외 파일 수정이 있는가?" |
 | trust-ledger | `${DEV_DIR}/trust-ledger.md` | "이미 보고된 항목 제외, 신규 위험만" |
 | self-check | `${DEV_DIR}/self-check.md` | "자기점검 Warning/Info 중복 보고 금지" |
-| codemap | `${DEV_DIR}/codemap.md` | "탐색 부담 절감용 핵심 파일 목록" |
+| codemap | `${DEV_DIR}/codemap.md` | "탐색 부담 절감용 핵심 파일 목록" (선택 산출물) |
 
 **판정 규칙**:
 - prd, design 둘 다 없으면 → **fallback 모드** (Step 5의 산출물 부재 fallback 진입).
 - 둘 중 하나라도 있으면 → cross-review 본 모드 진행.
 - trust-ledger/self-check/codemap은 있으면 활용, 없어도 진행.
+- **codemap.md 부재는 정상**: ttutak `dev` 파이프라인은 codemap을 자동 생성하지 않는다. 부재 시 경고 없이 그대로 진행한다.
 
 또한 프로젝트 루트의 `references/` 디렉토리를 점검한다. 존재하면 `ARTIFACTS.references`에 파일 목록을 채운다.
 
@@ -712,7 +713,8 @@ Step 0-3에서 prd.md/design.md 둘 다 없으면 이 경로를 따른다.
 ```
 산출물(prd.md, design.md)이 없습니다.
 cross-review의 차별점인 "약속 대비 충실도 검증"을 수행할 수 없습니다.
-일반 모드로 진행하면 기본 /codex:review 또는 qa-manager 일반 리뷰와 거의 동일합니다.
+일반 모드로 진행하면 codex 일반 리뷰 또는 qa-manager 일반 리뷰와 거의 동일합니다.
+산출물을 먼저 만들고 싶다면 `/ttutak:dev`를 호출해 PRD/설계서를 생성하세요.
 ```
 
 ### F-2. 진행 여부 확인
@@ -770,7 +772,7 @@ node "${CODEX_COMPANION}" review --wait --base "${BASE_BRANCH}" --scope auto > "
 - **claude Task 실패**: 어느 한 Task가 실패하면 성공한 결과만으로 정규화. 사용자에게 부분 결과임을 명시.
 - **컨텍스트 초과**: Step 2-1의 슬라이싱으로 60,000 토큰 이하로 압축. 그래도 초과하면 사용자에게 `--scope stat` 사용 안내.
 - **diff 빈 파일**: 변경사항이 없으면 "변경사항이 없습니다." 표시 후 즉시 종료.
-- **pre-tool-guard 충돌**: ttutak의 PreToolUse hook이 codex companion 호출을 차단하면 사용자에게 hook 우회 안내 (드물 것).
+- **pre-tool-guard 충돌**: ttutak의 `pre-tool-guard.sh` 훅은 보호 브랜치 직접 커밋만 차단하므로 codex companion(`node ...`) 호출은 통과한다. 만약 사용자가 훅을 커스터마이징하여 차단된 경우, 임시 우회를 안내한다.
 
 ---
 
@@ -802,7 +804,6 @@ processed:
 
 ## 다른 스킬과의 관계
 
-- `/ttutak:dev`: cross-review의 산출물(prd/design/trust-ledger)을 생성한다. 선행 의존.
-- `/codex:review`: 일반 코드 리뷰. cross-review와 별개로 사용 가능.
-- `/codex:adversarial-review`: cross-review의 codex 경로보다 더 공격적인 비판이 필요하면 별도 호출.
-- `/ttutak:commit`, `/ttutak:pull-request`: cross-review 후 처리한 변경사항을 커밋/PR.
+- `/ttutak:dev`: cross-review의 산출물(prd/design/trust-ledger/self-check)을 생성한다. **선행 의존**. dev의 phase-review와 cross-review는 미션이 다르다 — phase-review는 구현 직후 일반 QA, cross-review는 PR 직전 산출물 정합성 검증이다.
+- `/ttutak:commit`, `/ttutak:pull-request`: cross-review에서 발견·수정한 변경사항을 커밋/PR로 마무리한다.
+- `/codex:review`, `/codex:adversarial-review` (codex 플러그인 별도 설치 시): 일반 코드 리뷰가 추가로 필요할 때 cross-review와 독립적으로 사용한다.
