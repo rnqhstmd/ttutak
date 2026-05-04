@@ -37,11 +37,27 @@ for f in "$PLUGIN" "$MARKET"; do
   fi
 done
 
-# 원자적 갱신: 두 파일 모두 tmp로 먼저 생성하고, 전부 검증된 뒤에만 원본 교체
-cleanup_tmp() {
-  rm -f "$PLUGIN.tmp" "$MARKET.tmp"
+# 원자적 갱신:
+#   1. 두 tmp 생성 + 검증
+#   2. 두 원본을 .bak으로 백업
+#   3. 두 mv 시도 (성공 시 .bak 정리, 실패 시 .bak 복원으로 부분 적용 차단)
+PLUGIN_BAK="$PLUGIN.bak"
+MARKET_BAK="$MARKET.bak"
+COMMIT_STARTED=false
+COMMIT_SUCCEEDED=false
+
+cleanup_on_exit() {
+  local code=$?
+  if [ "$COMMIT_STARTED" = "true" ] && [ "$COMMIT_SUCCEEDED" != "true" ]; then
+    # 두 mv 중간에 실패한 경우 백업으로 롤백
+    [ -f "$PLUGIN_BAK" ] && mv -f "$PLUGIN_BAK" "$PLUGIN"
+    [ -f "$MARKET_BAK" ] && mv -f "$MARKET_BAK" "$MARKET"
+    echo "error: 원자적 갱신 실패 — 원본으로 롤백했습니다." >&2
+  fi
+  rm -f "$PLUGIN.tmp" "$MARKET.tmp" "$PLUGIN_BAK" "$MARKET_BAK"
+  exit $code
 }
-trap cleanup_tmp EXIT
+trap cleanup_on_exit EXIT
 
 # plugin.json의 name을 먼저 읽어 marketplace 갱신 대상 식별
 PLUGIN_NAME=$(jq -r '.name' "$PLUGIN")
@@ -56,7 +72,7 @@ if [ "$HAS_PLUGIN" = "0" ]; then
   exit 1
 fi
 
-# 두 tmp 생성 (실패 시 trap이 정리)
+# 1. 두 tmp 생성 (실패 시 trap이 정리)
 jq --arg v "$V" '.version = $v' "$PLUGIN" > "$PLUGIN.tmp"
 jq --arg v "$V" --arg name "$PLUGIN_NAME" '(.plugins[] | select(.name == $name)).version = $v' "$MARKET" > "$MARKET.tmp"
 
@@ -70,10 +86,15 @@ if [ "$TMP_PV" != "$V" ] || [ "$TMP_MV" != "$V" ]; then
   exit 1
 fi
 
-# 모든 검증 통과 후에만 원본 교체 (부분 적용 방지)
+# 2. 백업 — 두 mv 어느 쪽이든 실패하면 trap에서 복원
+cp "$PLUGIN" "$PLUGIN_BAK"
+cp "$MARKET" "$MARKET_BAK"
+
+# 3. commit 단계: COMMIT_STARTED=true 이후 실패하면 trap이 .bak으로 롤백
+COMMIT_STARTED=true
 mv "$PLUGIN.tmp" "$PLUGIN"
 mv "$MARKET.tmp" "$MARKET"
-trap - EXIT
+COMMIT_SUCCEEDED=true
 
 echo "✅ plugin.json / marketplace.json → $V"
 

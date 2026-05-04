@@ -24,8 +24,12 @@ ARGS[0]이 없으면 → 아래 자동 감지 로직 실행.
 
 state.md를 재개하기 전에 외부 개입으로 인한 불일치를 감지한다.
 
-1. **브랜치 정합성**: state.md의 `branch` 필드와 `git branch --show-current` 결과를 비교한다. 불일치 시 AskUserQuestion을 띄운다:
-   - "기존 `.dev/{state.md의 branch}/`를 현재 브랜치(`{현재 브랜치}`)로 이관" → 이관 실행.
+1. **브랜치 정합성**: state.md의 `branch` 필드와 `git branch --show-current` 결과를 비교한다. 표기 규약은 다음과 같다:
+   - `{state.md의 branch}` / `{현재 브랜치}`: 원본 브랜치명 (예: `feat/login`).
+   - `{old-slug}` / `{new-slug}`: 각 브랜치명에서 `/`를 `-`로 치환한 **DEV_DIR 슬러그** (예: `feat-login`).
+
+   불일치 시 AskUserQuestion을 띄운다:
+   - "기존 DEV_DIR `.dev/{old-slug}/` (state.md의 branch=`{state.md의 branch}`)를 현재 브랜치 DEV_DIR `.dev/{new-slug}/` (`{현재 브랜치}`)로 이관" → 이관 실행.
      - 이관 전에 목적지 `.dev/{new-slug}/`가 이미 존재하는지 확인한다. **존재 시 `mv`를 사용하지 않는다** (목적지 내부로 중첩 이동되어 구조가 깨진다).
      - 존재하지 않으면: `mv ".dev/{old-slug}" ".dev/{new-slug}"`.
      - 존재하면: 추가 AskUserQuestion — ①"기존 `.dev/{new-slug}/`를 `.dev/{new-slug}.backup-$(date +%s)/`로 백업 후 이관" / ②"중단". 백업 선택 시 `mv ".dev/{new-slug}" ".dev/{new-slug}.backup-$(date +%s)"` → `mv ".dev/{old-slug}" ".dev/{new-slug}"` 순서로 실행.
@@ -163,6 +167,7 @@ ARGS[0]에서 도메인 키워드를 추출하여 `PROJECT_ROOT` 내에서 관�
 - phase: setup, status: in_progress
 - branch, base, project-type, project-root, args, flags 기록
 - mode, intent-source 기록 (의도 파싱 결과)
+- **auto-stashed**: Step 2.1의 `AUTO_STASHED` 값(true/false). Step 2.3에서 stash pop이 완료되면 false로 갱신한다. 파이프라인이 stash 이후 중단되어도 `--resume`이 이 값을 보고 보류된 stash를 복원한다.
 - **last-known-head**: `git rev-parse HEAD` 결과. 재개 시 외부 커밋 감지에 사용한다. 각 Phase 종료 시 갱신한다.
 - phases: { setup: completed }
 

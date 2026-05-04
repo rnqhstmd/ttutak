@@ -42,10 +42,15 @@ check_segment() {
     return 1
   fi
 
+  # `-C` 옵션 추출:
+  #   - 공백 없는 `-C/path` 형식 지원 (`-C[[:space:]]*`)
+  #   - 여러 `-C`가 있으면 git은 마지막 것을 적용하므로 루프로 마지막 매치를 찾는다
   local git_path="."
-  if [[ "$seg" =~ -C[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\'|([^[:space:]]+)) ]]; then
+  local temp_seg="$seg"
+  while [[ "$temp_seg" =~ -C[[:space:]]*(\"([^\"]+)\"|\'([^\']+)\'|([^[:space:]]+))(.*) ]]; do
     git_path="${BASH_REMATCH[2]}${BASH_REMATCH[3]}${BASH_REMATCH[4]}"
-  fi
+    temp_seg="${BASH_REMATCH[5]}"
+  done
 
   local branch
   branch=$(git -C "$git_path" symbolic-ref --short HEAD 2>/dev/null || echo "")

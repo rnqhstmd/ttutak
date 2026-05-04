@@ -141,6 +141,16 @@ run_case "m. 복합명령 - 두번째 세그먼트 main 차단" \
 run_case "n. 복합명령 - 양쪽 모두 feat 허용" \
   "allow" "$REPO_MAIN" "git -C $REPO_FEAT commit -m a && git -C $REPO_FEAT commit -m b"
 
+# `-C` 추출 보강: 공백 없는 -C/path, 다중 -C 마지막 적용
+run_case "o. -C/path 공백 없는 형식 차단 (main)" \
+  "deny" "$REPO_FEAT" "git -C$REPO_MAIN commit -m msg"
+
+run_case "p. 다중 -C 마지막이 main이면 차단" \
+  "deny" "$REPO_FEAT" "git -C $REPO_FEAT -C $REPO_MAIN commit -m msg"
+
+run_case "q. 다중 -C 마지막이 feat이면 허용" \
+  "allow" "$REPO_MAIN" "git -C $REPO_MAIN -C $REPO_FEAT commit -m msg"
+
 echo
 echo "=== 결과: PASS=$PASS, FAIL=$FAIL ==="
 if [ "$FAIL" -gt 0 ]; then

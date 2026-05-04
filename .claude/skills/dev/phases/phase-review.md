@@ -61,7 +61,7 @@ build, test 모두 통과해야 Step 1로 진행한다. 단일 Gate에서 오케
 
 `wc -l < ${DIFF_FILE}`로 라인 수를 확인한다. **0줄**이면 사용자가 파이프라인 도중 수동 커밋을 끼워 넣었을 가능성이 있다.
 
-1. 베이스 브랜치가 결정되어 있으면 `git log {base}..HEAD --oneline`으로 브랜치 커밋 존재 여부를 확인한다.
+1. 베이스 브랜치가 결정되어 있으면 `${GIT_PREFIX} log {base}..HEAD --oneline`으로 브랜치 커밋 존재 여부를 확인한다.
 2. 커밋이 1건 이상이면 "수동 커밋 감지" 경로로 진입:
    - AskUserQuestion:
      - "브랜치 diff로 리뷰 — `{base}...HEAD` 전체를 리뷰 대상으로 사용합니다."
