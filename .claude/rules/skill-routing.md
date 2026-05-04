@@ -13,6 +13,7 @@
 | `정책 확인`, `영향도`, `현행 분석`, `코드에서 찾아`, `lens` | `/ttutak:lens` |
 | `테스트`, `테스트 작성`, `테스트 추가`, `test`, `테스트해줘` | `/ttutak:test` |
 | `기술 부채`, `부채 분석`, `코드 건강`, `tech-debt`, `부채 확인` | `/ttutak:tech-debt` |
+| `교차 리뷰`, `교차 검증`, `크로스 리뷰`, `cross review` | `/ttutak:cross-review` |
 
 ## 순차 스킬 체이닝
 
