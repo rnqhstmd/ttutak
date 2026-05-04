@@ -277,7 +277,7 @@ advisor의 컨텍스트 한계를 고려하여 다음 우선순위로 산출물�
 | 4 | references 목록 | `references/` 파일명 + 첫 200자 요약 (`head -c 200 ${file}` 또는 Read의 `limit: 5`) | 표준 위반 검증용 |
 
 **컨텍스트 폭발 방지**:
-- 각 산출물 추출 후 합산 토큰을 추정한다 (한국어 기준 1줄 ≈ 30자 ≈ 30~40토큰 가정. 영어 위주면 1줄 ≈ 8토큰).
+- 각 산출물 추출 후 합산 토큰을 추정한다 (한국어 기준 1글자 ≈ 2.5토큰, 1줄(30자) ≈ 75토큰 가정. 영어 위주면 1줄 ≈ 8토큰).
 - 합산이 60,000 토큰을 넘으면:
   - 4순위(references) → 파일명만 남기고 본문 제거.
   - 3순위(codemap) → 핵심 파일 5개만.
@@ -302,12 +302,26 @@ done >> "${DIFF_FILE}"
 ```
 > `git diff <merge-base-commit>`는 working tree와 merge-base의 차이를 한 번에 보여주므로 staged + unstaged + 커밋된 변경은 모두 포함되지만, **`git add` 전 untracked 파일은 누락**된다. `/ttutak:dev` 직후 `git add` 전에 cross-review를 호출하는 흐름을 지원하기 위해 `git ls-files --others --exclude-standard`로 untracked 목록을 별도 수집하여 `git diff --no-index`로 신규 파일 diff를 합산한다.
 
-`wc -l < "${DIFF_FILE}"`로 줄 수 확인. **500줄 이상**이거나 `${SCOPE}` == `stat`인 경우:
-```bash
-git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat > "${DIFF_FILE}"
-echo "---" >> "${DIFF_FILE}"
-echo "위는 요약입니다. 변경된 파일을 Read 도구로 직접 확인하라." >> "${DIFF_FILE}"
-```
+`wc -l < "${DIFF_FILE}"`로 줄 수 확인. **500줄 이상**이거나 `${SCOPE}` == `stat`인 경우 advisor에 따라 처리가 다르다:
+
+- **claude advisor**: Read 도구로 직접 파일을 읽을 수 있으므로 stat 요약 + 안내문으로 충분하다.
+  ```bash
+  git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat > "${DIFF_FILE}"
+  echo "---" >> "${DIFF_FILE}"
+  echo "위는 요약입니다. 변경된 파일을 Read 도구로 직접 확인하라." >> "${DIFF_FILE}"
+  ```
+- **codex advisor**: codex companion은 외부 CLI라 본 세션의 Read 도구를 호출할 수 없다. stat 요약만으로는 실제 코드 변경을 못 보고 정확도가 크게 떨어진다. 따라서 codex 경로에서는 다음 우선순위로 처리한다:
+  1. 가능하면 전체 diff를 그대로 전달한다 (`${SCOPE}`가 명시적으로 `stat`이 아니면 500줄 초과여도 전체 유지).
+  2. `${SCOPE}` == `stat`이 명시되었거나 diff가 컨텍스트 한계(예: 50,000줄)를 명백히 초과하면 **핵심 파일 위주 부분 diff**를 만든다:
+     ```bash
+     # stat에서 변경량 큰 상위 N개 파일을 추출하여 부분 diff로 묶는다
+     git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat \
+       | awk 'NF>=3 {print $NF, $(NF-2)}' | sort -k2 -n -r | head -20 \
+       | awk '{print $1}' > "${DEV_DIR}/diff-files.txt"
+     git diff "$(git merge-base HEAD "${BASE_BRANCH}")" -- $(cat "${DEV_DIR}/diff-files.txt") > "${DIFF_FILE}"
+     git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat >> "${DIFF_FILE}"
+     ```
+  3. 이래도 초과하면 사용자에게 알리고 중단한다 — codex로는 stat-only 검증을 하지 않는다.
 
 ### 2-3. 컨텍스트 통합
 
@@ -406,7 +420,7 @@ references/ 디렉토리의 파일별로 위반 여부.
 
 ```bash
 node "${CODEX_COMPANION}" task --prompt-file "${PROMPT_FILE}" \
-  > "${RAW_FILE}" 2>&1
+  > "${RAW_FILE}" 2> "${DEV_DIR}/cross-review.err"
 ```
 
 - companion이 정식 지원하는 `--prompt-file` 플래그로 파일 경로만 전달한다. 위치 인자에 본문을 펼치지 않으므로 OS 명령줄 길이 제한(`ARG_MAX`, Windows ~32KB)을 회피한다.
@@ -415,7 +429,7 @@ node "${CODEX_COMPANION}" task --prompt-file "${PROMPT_FILE}" \
 
 #### 3a-3. 응답 검증
 
-1. 종료 코드 0 확인. 실패 시 stderr 마지막 20줄을 사용자에게 표시하고 중단.
+1. 종료 코드 0 확인. 실패 시 `${DEV_DIR}/cross-review.err` 마지막 20줄을 사용자에게 표시하고 중단.
 2. `${RAW_FILE}` 줄 수 확인. 0줄이면 호출 실패로 간주.
 3. 영어 응답 감지: 첫 50줄에서 한국어 문자(가-힣) 비율이 20% 미만이면 영어로 간주. 이 경우 한국어 정규화 단계를 추가:
    - 오케스트레이터가 직접 응답을 한국어로 재작성한다 (의미는 보존).
