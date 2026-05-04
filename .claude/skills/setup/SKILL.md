@@ -13,6 +13,9 @@ allowed-tools:
   - "Bash(command *)"
   - "Bash(uname *)"
   - "Bash(java *)"
+  - "Bash(test *)"
+  - "Bash(mkdir *)"
+  - "Bash(cp *)"
   - Read
   - Write
   - Edit
@@ -49,6 +52,20 @@ allowed-tools:
    - **Linux**: `sudo apt install openjdk-17-jdk` 또는 `sudo yum install java-17-openjdk-devel`
    - **macOS**: `brew install openjdk@17`
    - **Windows (MSYS/Git Bash)**: https://adoptium.net 에서 다운로드 안내
+
+### 1-5단계: `.claude/config.json` 초기화
+
+프로젝트 루트에 `.claude/config.json`이 없으면 플러그인이 번들한 기본 템플릿을 복사한다. 이미 있으면 스킵한다.
+
+1. `test -f .claude/config.json`으로 존재 여부 확인.
+2. **이미 존재**: `config.json : 이미 존재 ✅ (스킵)` 출력 후 다음 단계.
+3. **부재 시**:
+   - 템플릿 경로: `${CLAUDE_PLUGIN_ROOT}/.claude/config.json` (플러그인 번들 기본값).
+   - `mkdir -p .claude` 후 `cp "${CLAUDE_PLUGIN_ROOT}/.claude/config.json" .claude/config.json` 실행.
+   - 복사 실패 시: "플러그인 템플릿을 찾을 수 없습니다. 수동으로 `.claude/config.json`을 생성해주세요." 안내 후 계속 진행.
+   - 성공 시: `config.json : 생성 완료 ✅` 출력.
+
+> **주의**: 기존 파일은 덮어쓰지 않는다. 재설정이 필요하면 사용자가 직접 삭제 후 재실행하도록 안내한다.
 
 ### 2단계: GH 인증
 

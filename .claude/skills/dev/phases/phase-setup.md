@@ -20,6 +20,24 @@ ARGS[0]이 없으면 → 아래 자동 감지 로직 실행.
      - "새로 시작" → Step 1로 진행 (Step 7에서 덮어씀)
 3. state.md가 없거나 `status: completed`이면 → Step 1로 진행.
 
+### 0.1 재개 정합성 체크 (이어서 진행 선택 시)
+
+state.md를 재개하기 전에 외부 개입으로 인한 불일치를 감지한다.
+
+1. **브랜치 정합성**: state.md의 `branch` 필드와 `git branch --show-current` 결과를 비교한다. 표기 규약은 다음과 같다:
+   - `{state.md의 branch}` / `{현재 브랜치}`: 원본 브랜치명 (예: `feat/login`).
+   - `{old-slug}` / `{new-slug}`: 각 브랜치명에서 `/`를 `-`로 치환한 **DEV_DIR 슬러그** (예: `feat-login`).
+
+   불일치 시 AskUserQuestion을 띄운다:
+   - "기존 DEV_DIR `.dev/{old-slug}/` (state.md의 branch=`{state.md의 branch}`)를 현재 브랜치 DEV_DIR `.dev/{new-slug}/` (`{현재 브랜치}`)로 이관" → 이관 실행.
+     - 이관 전에 목적지 `.dev/{new-slug}/`가 이미 존재하는지 확인한다. **존재 시 `mv`를 사용하지 않는다** (목적지 내부로 중첩 이동되어 구조가 깨진다).
+     - 존재하지 않으면: `mv ".dev/{old-slug}" ".dev/{new-slug}"`.
+     - 존재하면: 추가 AskUserQuestion — ①"기존 `.dev/{new-slug}/`를 `.dev/{new-slug}.backup-$(date +%s)/`로 백업 후 이관" / ②"중단". 백업 선택 시 `mv ".dev/{new-slug}" ".dev/{new-slug}.backup-$(date +%s)"` → `mv ".dev/{old-slug}" ".dev/{new-slug}"` 순서로 실행.
+     - 경로에 공백/특수문자가 포함될 수 있으므로 `mv` 인자는 반드시 따옴표로 감싼다.
+   - "새로 시작" → 기존 `.dev/{old-slug}/`는 유지하고 Step 1로 진행.
+   - "중단" → 사용자에게 수동 정리를 요청하고 종료.
+2. **HEAD 정합성**: state.md에 `last-known-head` 필드가 있고 현재 `git rev-parse HEAD`와 다르면, `git log {last-known-head}..HEAD --oneline`으로 외부 커밋 개수를 센다. 1개 이상이면 사용자에게 보고: "외부 커밋 {N}건이 감지되었습니다: {sha1}..{sha2}. 계속하시려면 확인해주세요." 후 AskUserQuestion으로 진행/중단 선택.
+
 **이어서 진행 시:**
 - state.md에서 GIT_PREFIX, PROJECT_ROOT, 베이스 브랜치, 프로젝트 타입, ARGS[0], flags를 복원.
 - `test -d`로 경로 검증. 실패 시 "작업 경로가 유효하지 않습니다." → 새로 시작.
@@ -38,13 +56,48 @@ ARGS[0]이 없으면 → 아래 자동 감지 로직 실행.
 ## Step 2: 베이스 브랜치 결정
 공유 규칙의 "베이스 브랜치 감지"에 따라 결정한다.
 
-결정 후 베이스 브랜치를 최신 상태로 동기화한다:
-1. `git remote get-url origin`으로 remote 존재를 확인한다. 없으면 건너뛴다.
-2. `git checkout <base-branch>`를 실행한다. 실패 시 경고를 표시하고 현재 로컬 상태로 계속 진행한다.
+결정 후 베이스 브랜치를 최신 상태로 동기화한다. **작업 중 변경사항은 자동 stash로 보호한다.**
+
+### 2.1 자동 stash 보호
+
+`git checkout`/`git pull` 전에 워킹 디렉토리의 미커밋 변경을 보존하고 워킹 디렉토리를 깨끗하게 비운다.
+
+1. `git status --porcelain` 실행. 결과가 비어 있지 않으면 미커밋 변경이 존재한다.
+2. 변경이 있으면:
+   - `git stash push -u -m "ttutak-dev-auto-$(date +%s)"` 실행. `-u` 옵션으로 untracked 파일까지 포함해 워킹 디렉토리를 비우고 변경을 보관한다.
+   - (참고) `git stash create`/`store` 조합은 워킹 디렉토리를 비우지 않으므로 이후 `checkout` 충돌을 유발한다. 반드시 `push -u`만 사용한다.
+   - `AUTO_STASHED=true`로 기록하고 `git stash list` 최상단 ref를 state.md `execution-log`의 `auto-stash: <ref>` 엔트리에 저장한다.
+3. 변경이 없으면 `AUTO_STASHED=false`.
+
+### 2.2 베이스 브랜치 동기화
+
+1. `git remote get-url origin`으로 remote 존재를 확인한다. 없으면 pull 단계만 건너뛴다.
+2. `git checkout <base-branch>`를 실행한다. 실패 시 경고를 표시하고 2.3으로 진행한다.
 3. checkout 성공 시, `git pull origin <base-branch>`를 실행한다. pull 실패 시 (네트워크 오류 등) 경고를 표시하고 현재 로컬 상태로 계속 진행한다.
+
+### 2.3 stash 복원
+
+Step 5 (작업 브랜치 생성)가 완료된 후에만 stash를 복원한다. 그 전에 복원하면 베이스 브랜치로 변경이 섞일 수 있다.
+
+1. `AUTO_STASHED=true`이면 **Step 5 종료 시점**에 `git stash pop` 실행.
+2. pop 충돌 발생 시 사용자에게 보고하고 AskUserQuestion:
+   - "stash를 유지하고 수동 해결" → conflict 상태를 유지한 채 파이프라인 일시 중단. 사용자가 해결 후 재개 지시.
+   - "stash를 drop하고 계속" → `git stash drop`으로 버리고 다음 단계 진행. 위험 수용을 state.md에 기록.
+3. 복원 성공 시 `AUTO_STASHED=false`로 초기화하고 execution-log에 `auto-stash-restored` 기록.
 
 ## Step 3: 프로젝트 정보 수집
 `PROJECT_ROOT = ./` (현재 디렉토리).
+
+### 3.0 config.json 가드 (필수 선행)
+
+`test -f .claude/config.json`로 존재 여부를 확인한다.
+- **부재 시**: AskUserQuestion — "`.claude/config.json`이 없습니다. `/ttutak:setup`으로 자동 생성할까요?"
+  - "자동 생성" → `Skill("ttutak:setup")`을 호출. 생성 완료 후 다시 3.0을 검증.
+  - "직접 생성 후 재실행" → 파이프라인 중단.
+- **존재 시**: Read하여 `projectTypes`, `sensitiveFilePatterns`, `buildArtifactPatterns`, `timeouts`, `contextLimits`를 변수에 로드.
+- JSON 파싱 실패 시: "config.json이 손상되었습니다. 백업 후 재설정하세요." 출력 후 중단.
+
+### 3.1 병렬 수집
 
 아래 5개 작업은 서로 독립적이므로 **병렬로 실행**한다:
 1. **프로젝트 타입 감지**: `.claude/config.json`의 `projectTypes`에서 detect 필드와 매칭한다 (예: `build.gradle.kts` → `java-spring`, `package.json` → `node`). 여러 타입이 감지되면 모두 기록한다.
@@ -86,6 +139,7 @@ ARGS[0]에서 도메인 키워드를 추출하여 `PROJECT_ROOT` 내에서 관�
   2. **이슈 키가 있으면**: 이슈 키를 브랜치명으로 사용 (e.g., `[JIRA-123] 로그인 기능 추가` → 브랜치 `JIRA-123`)
   3. **이슈 키가 없으면**: 핵심 키워드 추출, 한국어→영어 번역, 최대 40자 (e.g., `로그인 기능 추가` → `login-feature`)
 - `git checkout -b <branch-name>`으로 브랜치를 생성한다. 브랜치가 이미 존재하면 (`already exists` 에러) `git checkout <branch-name>`으로 전환한다.
+- **작업 브랜치 전환 완료 직후 `Step 2.3 stash 복원` 절차를 수행한다** (`AUTO_STASHED=true`인 경우).
 - 완료 후 프로젝트 타입, 브랜치명, 작업 경로를 사용자에게 보고.
 
 ## Step 6: .gitignore 자동 보강
@@ -113,5 +167,7 @@ ARGS[0]에서 도메인 키워드를 추출하여 `PROJECT_ROOT` 내에서 관�
 - phase: setup, status: in_progress
 - branch, base, project-type, project-root, args, flags 기록
 - mode, intent-source 기록 (의도 파싱 결과)
+- **auto-stashed**: Step 2.1의 `AUTO_STASHED` 값(true/false). Step 2.3에서 stash pop이 완료되면 false로 갱신한다. 파이프라인이 stash 이후 중단되어도 `--resume`이 이 값을 보고 보류된 stash를 복원한다.
+- **last-known-head**: `git rev-parse HEAD` 결과. 재개 시 외부 커밋 감지에 사용한다. 각 Phase 종료 시 갱신한다.
 - phases: { setup: completed }
 

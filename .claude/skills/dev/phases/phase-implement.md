@@ -201,6 +201,32 @@ Agent가 설계에서 벗어난 판단을 했다면 해당 내용을 특이사�
 ```
 이후 테스트 작성으로 진행.
 
+## Hotfix 전용 긴급 보안 감사 (hotfix 모드만)
+
+**조건**: `--hotfix` 모드이고 자기점검(Step 6)이 완료된 직후에만 실행한다. 정상 플로우에서는 phase-review가 감사를 수행하므로 이 단계를 건너뛴다.
+
+`phase-review`를 hotfix에서 건너뛰면서 security-auditor가 전혀 호출되지 않던 공백을 보완한다. CRITICAL/HIGH만 보고하도록 범위를 제한하여 hotfix의 경량성을 유지한다.
+
+**Step H1**: `Task(subagent_type="security-auditor")` — prompt에 다음을 포함:
+- 경량 PRD (`${DEV_DIR}/prd.md` Read)
+- 변경사항 diff 파일 경로 (`DIFF_FILE`) + Read 지시
+- 코드 맵
+- REFERENCES (있으면)
+- "**hotfix 긴급 감사** — CRITICAL/HIGH만 보고할 것. MEDIUM/LOW는 생략한다. 응답 형식은 `### Hotfix 긴급 감사` 섹션으로 시작하는 Trust Ledger 포맷."
+
+**Step H2**: 결과를 `${DEV_DIR}/trust-ledger.md`에 Write/Append한다:
+- `### Hotfix 긴급 감사` 섹션 하위에 감사 항목을 기록한다.
+- 파일이 없으면 신규 생성, 있으면 섹션을 Append.
+
+**Step H3**: 결과 분기:
+- CRITICAL/HIGH 0건 → "hotfix 감사 통과 (CRITICAL 0, HIGH 0)" 보고 후 phase-complete로 진행.
+- CRITICAL/HIGH 1건 이상 → 항목을 사용자에게 요약 표시 후 AskUserQuestion:
+  - "자동 수정 시도" → `Task(subagent_type="coder")`에 감사 항목 + 수정 방안 + 코드 맵을 전달 (수정 모드). 수정 완료 후 한 번 더 security-auditor 재호출 (재호출 1회만). 재호출 결과는 Trust Ledger에 추가.
+  - "이대로 진행" → 위험 수용. `### Hotfix 긴급 감사` 섹션 말미에 "사용자 확인: 이대로 진행"을 기록.
+  - "중단" → 파이프라인 중단. state.md에 `status: cancelled` 기록.
+
+**Step H4**: `execution-log`에 `phase: implement, agent: security-auditor (hotfix-audit), result: "CRITICAL n, HIGH n"` 기록.
+
 ## 테스트 작성
 
 **Step 7**: `Skill("ttutak:test")`를 호출하여 구현된 코드에 대한 테스트를 작성한다.
