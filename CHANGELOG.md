@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.3.0 (2026-05-04) — cross-review 스킬 추가
+
+### Features
+- **cross-review**: dev 산출물(PRD/설계서/Trust Ledger) 기반 교차 검증 리뷰 스킬 추가
+  - codex / claude 두 advisor 경로 지원 (선택 가능)
+  - codex 경로: codex CLI + companion 스크립트로 다른 모델 관점의 교차 검증
+  - claude 경로: qa-manager + security-auditor 병렬 호출 (cross-review 미션 contract)
+  - 검증 미션: AC 충족 매트릭스 / 설계 범위 이탈 / 신규 위험 / references 위반
+  - trust-ledger·self-check 기반 중복 보고 차단
+  - 산출물 부재 시 fallback 모드 (일반 리뷰)
+  - 발견 항목 일괄 처리 (전부/일부/직접 입력/건너뛰기)
+  - 자동 수정 금지, 모든 수정은 사용자 승인 후 coder 위임
+
 ## v1.2.1 (2026-04-22) — 워크플로우 견고화 + 릴리스 자동화
 
 ### Fixes
