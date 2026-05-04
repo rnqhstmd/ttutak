@@ -1,5 +1,6 @@
 ---
 name: cross-review
+version: 1.0.0
 description: dev 산출물(PRD/설계서/Trust Ledger)을 컨텍스트로 주입한 교차 검증 리뷰를 수행한다. "교차 리뷰", "교차 검증", "cross review", "크로스 리뷰" 시 사용. /ttutak:dev 완료 후 단발 호출 전용.
 argument-hint: ""
 allowed-tools:
@@ -133,15 +134,11 @@ allowed-tools:
    - 2개 이상이면 AskUserQuestion으로 선택:
      ```
      AskUserQuestion(
-       questions: [{
-         question: "베이스 브랜치를 선택해주세요.",
-         header: "베이스 브랜치",
-         options: [
-           { label: "main", description: "기본 브랜치" },
-           { label: "develop", description: "개발 브랜치" }
-         ],
-         multiSelect: false
-       }]
+       question: "베이스 브랜치를 선택해주세요.",
+       options: [
+         { value: "main", label: "main", description: "기본 브랜치" },
+         { value: "develop", label: "develop", description: "개발 브랜치" }
+       ]
      )
      ```
    - 1개면 자동 선택.
@@ -199,19 +196,15 @@ allowed-tools:
 
 ```
 AskUserQuestion(
-  questions: [{
-    question: "어떤 advisor로 교차 검증을 수행할까요?",
-    header: "advisor 선택",
-    options: [
-      { label: "codex (Recommended)", description: "다른 모델(GPT-5.4) 관점으로 교차 검증" },
-      { label: "claude", description: "ttutak의 qa-manager + security-auditor를 cross-review 미션으로 호출 (omc 의존 없음)" }
-    ],
-    multiSelect: false
-  }]
+  question: "어떤 advisor로 교차 검증을 수행할까요?",
+  options: [
+    { value: "codex", label: "codex (Recommended)", description: "다른 모델(GPT-5.4) 관점으로 교차 검증" },
+    { value: "claude", label: "claude", description: "ttutak의 qa-manager + security-auditor를 cross-review 미션으로 호출" }
+  ]
 )
 ```
 
-선택 결과를 `${ADVISOR}`에 저장한다.
+선택 결과의 `value`(`codex` 또는 `claude`)를 `${ADVISOR}`에 저장한다. label은 표시 전용이므로 분기에 사용하지 않는다.
 
 ### 1-1. codex 환경 사전 점검 (codex 선택 시)
 
@@ -304,11 +297,16 @@ done >> "${DIFF_FILE}"
 
 `wc -l < "${DIFF_FILE}"`로 줄 수 확인. **500줄 이상**이거나 `${SCOPE}` == `stat`인 경우 advisor에 따라 처리가 다르다:
 
-- **claude advisor**: Read 도구로 직접 파일을 읽을 수 있으므로 stat 요약 + 안내문으로 충분하다.
+- **claude advisor**: Read 도구로 직접 파일을 읽을 수 있으므로 stat 요약 + 안내문으로 충분하다. 단, 위 단계에서 합산한 untracked 파일 diff가 stat overwrite로 사라지지 않도록 stat 요약을 **prepend**하고 untracked 파일 목록은 별도로 보존한다.
   ```bash
-  git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat > "${DIFF_FILE}"
-  echo "---" >> "${DIFF_FILE}"
-  echo "위는 요약입니다. 변경된 파일을 Read 도구로 직접 확인하라." >> "${DIFF_FILE}"
+  STAT_TMP="${DEV_DIR}/diff.stat.tmp"
+  git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat > "${STAT_TMP}"
+  echo "---" >> "${STAT_TMP}"
+  echo "위는 tracked 변경 요약입니다. 변경된 파일을 Read 도구로 직접 확인하라." >> "${STAT_TMP}"
+  echo "" >> "${STAT_TMP}"
+  echo "### Untracked 파일 (별도 추가됨)" >> "${STAT_TMP}"
+  git ls-files --others --exclude-standard >> "${STAT_TMP}"
+  mv "${STAT_TMP}" "${DIFF_FILE}"
   ```
 - **codex advisor**: codex companion은 외부 CLI라 본 세션의 Read 도구를 호출할 수 없다. stat 요약만으로는 실제 코드 변경을 못 보고 정확도가 크게 떨어진다. 따라서 codex 경로에서는 다음 우선순위로 처리한다:
   1. 가능하면 전체 diff를 그대로 전달한다 (`${SCOPE}`가 명시적으로 `stat`이 아니면 500줄 초과여도 전체 유지).
@@ -360,7 +358,7 @@ diff 파일: ${DIFF_FILE}
 </grounding_rules>
 
 <structured_output_contract>
-다음 4개 섹션을 정확히 이 순서로 출력한다:
+다음 5개 섹션을 정확히 이 순서로 출력한다 (`references 위반`은 references/가 없거나 위반 항목이 없으면 본문에 "위반 없음"으로 적되 **섹션 헤더는 항상 유지**한다 — 정규화 파서가 섹션 존재를 가정한다):
 
 ## AC 충족 매트릭스
 | AC | 충족 | 근거 (파일:라인 또는 PRD 인용) |
@@ -379,9 +377,8 @@ trust-ledger.md에 없는 신규 risk/policy/gap/assumption만.
   - 근거: ...
   - 권고: ...
 
-## references 위반 (해당 시)
-references/ 디렉토리의 파일별로 위반 여부.
-없으면 섹션 자체 생략.
+## references 위반
+references/ 디렉토리의 파일별로 위반 여부. references/가 없거나 위반이 없으면 "위반 없음"으로 적는다 (섹션 헤더는 항상 유지).
 
 ## 총평
 - 강점 1-2개
@@ -551,9 +548,9 @@ advisor와 무관하게 동일한 포맷으로 정규화하여 `${RESULT_FILE}`�
 ### Info
 - ...
 
-## references 위반 (해당 시)
+## references 위반
 
-(섹션 자체를 생략 가능)
+(references/가 없거나 위반이 없으면 "위반 없음"으로 표기. 섹션 헤더는 항상 유지)
 
 ## 총평
 - 강점: ...
@@ -563,10 +560,7 @@ advisor와 무관하게 동일한 포맷으로 정규화하여 `${RESULT_FILE}`�
 
 ### 4-2. 파일 저장
 
-```bash
-# RESULT_FILE에 정규화된 결과 작성
-Write(${RESULT_FILE}, normalized_content)
-```
+`Write` 도구로 정규화된 결과를 `${RESULT_FILE}`에 저장한다. 이 호출은 Bash 명령이 아니라 **Claude Code의 Write 도구 호출**이다 (셸로 실행되지 않는다).
 
 `${RAW_FILE}`(advisor의 원시 응답)도 보존한다 — 사용자가 원본을 확인할 수 있도록.
 
@@ -607,17 +601,13 @@ Write(${RESULT_FILE}, normalized_content)
 
 ```
 AskUserQuestion(
-  questions: [{
-    question: "발견된 N개 항목을 어떻게 처리할까요?",
-    header: "처리 방식",
-    options: [
-      { label: "전부 수정", description: "모든 항목을 coder에 위임하여 수정" },
-      { label: "일부 수정", description: "항목별로 개별 선택" },
-      { label: "직접 입력", description: "Other로 이동해서 수정할 항목 번호를 자연어로 입력 (예: 1, 3, 5번)" },
-      { label: "전부 건너뛰기", description: "기록만 남기고 종료" }
-    ],
-    multiSelect: false
-  }]
+  question: "발견된 N개 항목을 어떻게 처리할까요?",
+  options: [
+    { value: "fix_all", label: "전부 수정", description: "모든 항목을 coder에 위임하여 수정" },
+    { value: "fix_partial", label: "일부 수정", description: "항목별로 개별 선택" },
+    { value: "fix_custom", label: "직접 입력", description: "Other로 이동해서 수정할 항목 번호를 자연어로 입력 (예: 1, 3, 5번)" },
+    { value: "skip_all", label: "전부 건너뛰기", description: "기록만 남기고 종료" }
+  ]
 )
 ```
 
@@ -651,17 +641,13 @@ prompt:
 질문 결과 "이후 전부 수정"이면 `${BATCH_MODE}` = `AUTO_FIX`, "이후 전부 건너뛰기"면 `${BATCH_MODE}` = `AUTO_SKIP`로 전환하고 다음 항목부터 적용한다.
 ```
 AskUserQuestion(
-  questions: [{
-    question: "1번 항목: [Critical] PaymentService:55 — 한도 초과 검증 누락. 수정할까요?",
-    header: "1/N",
-    options: [
-      { label: "수정", description: "이 항목을 coder에 위임" },
-      { label: "건너뛰기", description: "이 항목 건너뛰고 다음으로" },
-      { label: "이후 전부 수정", description: "이 항목부터 끝까지 모두 수정" },
-      { label: "이후 전부 건너뛰기", description: "이 항목부터 끝까지 모두 건너뛰기" }
-    ],
-    multiSelect: false
-  }]
+  question: "1번 항목: [Critical] PaymentService:55 — 한도 초과 검증 누락. 수정할까요?",
+  options: [
+    { value: "fix", label: "수정", description: "이 항목을 coder에 위임" },
+    { value: "skip", label: "건너뛰기", description: "이 항목 건너뛰고 다음으로" },
+    { value: "fix_rest", label: "이후 전부 수정", description: "이 항목부터 끝까지 모두 수정" },
+    { value: "skip_rest", label: "이후 전부 건너뛰기", description: "이 항목부터 끝까지 모두 건너뛰기" }
+  ]
 )
 ```
 
@@ -677,15 +663,11 @@ AskUserQuestion(
 오케스트레이터가 입력을 파싱하여 매칭되는 항목들을 식별한다. 모호하면 재확인:
 ```
 AskUserQuestion(
-  questions: [{
-    question: "다음 항목으로 이해했습니다: 1번, 3번, 5번. 맞나요?",
-    header: "확인",
-    options: [
-      { label: "맞음", description: "이 항목들로 진행" },
-      { label: "다시 입력", description: "Other로 다시 입력" }
-    ],
-    multiSelect: false
-  }]
+  question: "다음 항목으로 이해했습니다: 1번, 3번, 5번. 맞나요?",
+  options: [
+    { value: "ok", label: "맞음", description: "이 항목들로 진행" },
+    { value: "redo", label: "다시 입력", description: "Other로 다시 입력" }
+  ]
 )
 ```
 
@@ -702,15 +684,11 @@ AskUserQuestion(
 수정이 발생했으면 사용자에게 묻는다:
 ```
 AskUserQuestion(
-  questions: [{
-    question: "수정이 완료되었습니다. cross-review를 다시 실행할까요?",
-    header: "재실행",
-    options: [
-      { label: "재실행", description: "수정된 코드로 cross-review 재수행" },
-      { label: "종료", description: "현재 상태로 종료" }
-    ],
-    multiSelect: false
-  }]
+  question: "수정이 완료되었습니다. cross-review를 다시 실행할까요?",
+  options: [
+    { value: "rerun", label: "재실행", description: "수정된 코드로 cross-review 재수행" },
+    { value: "exit", label: "종료", description: "현재 상태로 종료" }
+  ]
 )
 ```
 
@@ -735,15 +713,11 @@ cross-review의 차별점인 "약속 대비 충실도 검증"을 수행할 수 �
 
 ```
 AskUserQuestion(
-  questions: [{
-    question: "일반 모드로 진행할까요?",
-    header: "fallback",
-    options: [
-      { label: "진행", description: "산출물 없이 diff만으로 일반 리뷰 수행" },
-      { label: "중단", description: "/ttutak:dev로 산출물을 먼저 생성하세요" }
-    ],
-    multiSelect: false
-  }]
+  question: "일반 모드로 진행할까요?",
+  options: [
+    { value: "proceed", label: "진행", description: "산출물 없이 diff만으로 일반 리뷰 수행" },
+    { value: "abort", label: "중단", description: "/ttutak:dev로 산출물을 먼저 생성하세요" }
+  ]
 )
 ```
 
