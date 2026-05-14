@@ -55,11 +55,15 @@ hotfix가 아닌 경우 아래 정상 플로우를 따른다.
 4. AskUserQuestion으로 승인을 받는다:
    ```
    AskUserQuestion(
-     question: "구현 계획을 확인해주세요.",
-     options: [
-       { value: "approve", label: "승인 — 구현 시작" },
-       { value: "modify", label: "수정 요청 — 변경할 항목을 알려주세요" }
-     ]
+     questions: [{
+       header: "구현 계획",
+       question: "구현 계획을 확인해주세요.",
+       multiSelect: false,
+       options: [
+         { label: "승인", description: "구현 시작" },
+         { label: "수정 요청", description: "Other로 이동해서 변경할 항목을 자연어로 입력해주세요" }
+       ]
+     }]
    )
    ```
    - **승인** → Step 1.5 (배치 구성)으로 진행.

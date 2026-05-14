@@ -56,11 +56,15 @@ design-critic 결과 처리:
 - **승인/수정 공통 패턴** (SKILL.md 공유 규칙)에 따라 AskUserQuestion을 사용한다:
   ```
   AskUserQuestion(
-    question: "설계를 확인해주세요.",
-    options: [
-      { value: "approve", label: "승인 — 구현 단계로 진행" },
-      { value: "modify", label: "수정 요청 — 수정할 부분을 알려주세요" }
-    ]
+    questions: [{
+      header: "설계 확인",
+      question: "설계를 확인해주세요.",
+      multiSelect: false,
+      options: [
+        { label: "승인", description: "구현 단계로 진행" },
+        { label: "수정 요청", description: "Other로 이동해서 수정할 부분을 자연어로 입력해주세요" }
+      ]
+    }]
   )
   ```
 - 승인 → phase-implement로 진행.

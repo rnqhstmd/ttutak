@@ -75,27 +75,35 @@ Arguments 문자열에서 아래 규칙으로 파싱한다:
 **Q2**: AskUserQuestion으로 결과물 형태를 선택받는다:
 ```
 AskUserQuestion(
-  question: "결과물 형태를 선택해 주세요.",
-  options: [
-    { value: "report", label: "종합 리포트 (추천)", description: "요약 → 주요 발견 → 상세 분석 → 출처" },
-    { value: "comparison", label: "비교표", description: "비교 기준 표 → 각 항목 요약 → 판단 근거" },
-    { value: "summary", label: "핵심 요약", description: "한 줄 결론 → 핵심 포인트 3-5개 → 출처" }
-  ]
+  questions: [{
+    header: "결과물",
+    question: "결과물 형태를 선택해 주세요.",
+    multiSelect: false,
+    options: [
+      { label: "종합 리포트 (Recommended)", description: "요약 → 주요 발견 → 상세 분석 → 출처" },
+      { label: "비교표", description: "비교 기준 표 → 각 항목 요약 → 판단 근거" },
+      { label: "핵심 요약", description: "한 줄 결론 → 핵심 포인트 3-5개 → 출처" }
+    ]
+  }]
 )
 ```
-"잘 모르겠어요" 또는 기타 입력 시 기본값 `report`를 적용한다.
+Other 입력 또는 라벨 매칭 불가 시 기본값 `종합 리포트`를 적용한다.
 
 **Q3**: AskUserQuestion으로 조사 깊이를 선택받는다:
 ```
 AskUserQuestion(
-  question: "조사 깊이를 선택해 주세요.",
-  options: [
-    { value: "thorough", label: "꼼꼼하게 (추천)", description: "다수 소스 교차 검증, 키워드 5개, 최대 10개 URL" },
-    { value: "quick", label: "빠르게 핵심만", description: "3-5개 소스, 키워드 3개, 최대 5개 URL" }
-  ]
+  questions: [{
+    header: "조사 깊이",
+    question: "조사 깊이를 선택해 주세요.",
+    multiSelect: false,
+    options: [
+      { label: "꼼꼼하게 (Recommended)", description: "다수 소스 교차 검증, 키워드 5개, 최대 10개 URL" },
+      { label: "빠르게 핵심만", description: "3-5개 소스, 키워드 3개, 최대 5개 URL" }
+    ]
+  }]
 )
 ```
-"잘 모르겠어요" 또는 기타 입력 시 기본값 `thorough`를 적용한다.
+Other 입력 또는 라벨 매칭 불가 시 기본값 `꼼꼼하게`를 적용한다.
 
 "잘 모르겠어요" 선택 시 기본값(종합 리포트, 꼼꼼하게)을 적용한다.
 
@@ -128,9 +136,9 @@ Phase 0 API 카탈로그:
 | Hacker News | `hacker news`, `hn`, `해커뉴스` | `https://hn.algolia.com/api/v1/search?query={키워드}&hitsPerPage=10` | hits → title·url·points·num_comments |
 | 프로그래밍 Q&A | `stackoverflow`, `스택오버플로우` | `https://api.stackexchange.com/2.3/search?intitle={키워드}&site=stackoverflow&order=desc&sort=votes` | items → title·link·score·answer_count |
 | npm 패키지 | `npm`, `노드 패키지`, `node package` | `https://registry.npmjs.org/-/v1/search?text={키워드}&size=10` | objects[].package → name·description·version·links.repository |
-| PyPI 패키지 | `pypi`, `파이썬 패키지`, `python package` | `https://pypi.org/pypi/{정확한 패키지명}/json` | info → name·summary·version·project_url. 404면 결과 없음으로 기록 |
-| 백과사전 | `wikipedia`, `위키`, `정의`, `용어` | `https://ko.wikipedia.org/api/rest_v1/page/summary/{topic}` | title·extract·content_urls.desktop.page. 404 시 영어 fallback 1회: `https://en.wikipedia.org/api/rest_v1/page/summary/{topic}` |
-| 한국 종합 뉴스 | "최근/최신/뉴스/보도" 중 1개 + 정치/사회/경제/IT 도메인 키워드 (단순 기술 키워드만 있으면 미매칭) | `https://news.google.com/rss/search?q={키워드}&hl=ko&gl=KR&ceid=KR:ko` | RSS item별 title·link·pubDate·source. 최근 10건 |
+| PyPI 패키지 | `pypi`, `파이썬 패키지`, `python package` | `https://pypi.org/pypi/{정확한 패키지명}/json` | info → name·summary·version·project_url. 404면 결과 없음으로 기록. **호출 가드**: PyPI 엔드포인트는 정확한 패키지명을 path로 요구하므로, 키워드가 **공백·한글이 포함된 자연어 문장이면 호출을 생략**하고 ❓로 기록한다. ASCII 영문 단일 토큰(예: `requests`, `numpy`) 또는 `package:{name}` 형태로 명시된 토큰만 호출한다. |
+| 백과사전 | `wikipedia`, `위키`, `정의`, `용어` | `https://ko.wikipedia.org/api/rest_v1/page/summary/{topic}` | title·extract·content_urls.desktop.page. `{topic}`은 URL-encoded 키워드. 404 시 영어 fallback 1회: `https://en.wikipedia.org/api/rest_v1/page/summary/{topic}` |
+| 한국 종합 뉴스 | "최근/최신/뉴스/보도" 중 1개 + 정치/사회/경제/IT 도메인 키워드 (단순 기술 키워드만 있으면 미매칭) | `https://news.google.com/rss/search?q={키워드}&hl=ko&gl=KR&ceid=KR:ko` | RSS item별 title·link·pubDate·source. 최근 10건. **AND 매칭**: 정규화된 주제+키워드 문자열에 시점 토큰(`최근`/`최신`/`뉴스`/`보도`) 중 1개 이상 + 도메인 토큰(`정치`/`사회`/`경제`/`it`) 중 1개 이상이 **동시에** substring 매칭될 때만 트리거한다. 둘 중 하나만 있으면 미매칭. |
 
 **모드 차등**:
 - 꼼꼼: 매칭된 모든 카테고리 호출
@@ -165,6 +173,7 @@ Phase 0 API 카탈로그:
    - Jina 응답이 429거나 본문에 `rate limit` 포함 시 즉시 ❓ 기록 + 이번 리서치에서 추가 Jina 호출 중단 (서킷 브레이커)
    - Jina 응답이 검증 통과면 결과 채택, `via Jina Reader` 표기
    - Jina 응답도 검증 실패면 ❓ 기록 후 다음 URL로 진행
+   - **서킷 브레이커 발동 후 잔여 URL**: 검증 실패해도 Jina 재시도 시도 자체를 생략하고 곧바로 ❓ 기록 후 다음 URL로 진행한다 (재시도 절차 진입 안 함).
 
 4. `.research/findings.md`에 결과 기록 (Phase 0 결과 + WebSearch 결과 병합). 매 실행 시 기존 findings.md를 덮어쓴다.
 
