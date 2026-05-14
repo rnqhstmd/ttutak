@@ -1,7 +1,7 @@
 ---
 name: dev
-version: 1.1.0
-description: "PRD → 설계 → 구현 → 리뷰 → 커밋/PR까지 전체 개발 사이클을 에이전트 팀이 Q&A 루프로 수행"
+version: 1.2.0
+description: "PRD → 설계 → 구현 → 리뷰 → 커밋/PR까지 전체 개발 사이클을 에이전트 팀이 순차 Q&A 루프로 수행"
 argument-hint: "<자연어 요청>"
 allowed-tools: ["Bash(git *)", "Bash(test *)", "Bash(mkdir *)", "Bash(cp *)", "Bash(mv *)", "Bash(ls *)", "Bash(find *)", "Bash(pwd *)", "Bash(basename *)", "Bash(dirname *)", "Bash(which *)", "Bash(./gradlew *)", "Bash(gh *)", "Bash(GH_HOST= *)", "Read", "Edit", "Write", "Glob", "Grep", "Task", "AskUserQuestion", "Skill"]
 ---
@@ -486,10 +486,29 @@ AskUserQuestion(
 #### 변환 규칙
 
 - **(권장)** 표시가 있는 선택지는 options 배열의 첫 번째에 배치한다.
+- **모든 질문에 권장 답변을 `(Recommended)` 라벨로 제시한다.** 코드베이스/git blame/맥락에서 추정 가능하면 그 답을, 주관 영역이면 발상 기준점용 `예: {예시}` 옵션으로 대체한다.
 - **"직접 입력"** 선택지는 항상 마지막에 배치한다. 사용자가 이 옵션을 선택하면 후속 AskUserQuestion(자유입력)으로 직접 값을 받는다.
-- 질문이 **2개 이상**이면 순서대로 하나씩 AskUserQuestion을 호출한다. 이전 답변이 다음 질문의 맥락에 영향을 주는 경우 반영한다.
+- 질문이 **2개 이상**이면 **반드시 1개씩** 순서대로 AskUserQuestion을 호출한다 (배치 발사 금지). 이전 답변이 다음 질문의 맥락에 영향을 주는 경우 반영한다.
+- **코드베이스로 답할 수 있는 질문은 사용자에게 묻지 않고 직접 탐색한다** (Glob/Grep/Read).
+- **결정 의존성**: 한 답변이 후속 질문의 전제를 바꾸면 후속 질문을 재구성하거나 종속 질문을 추가한다.
 - 에이전트가 기술 용어를 사용한 경우, 사용자에게 표시할 때 **비기술적 표현으로 의역**한다. 예: "JWT vs 세션" → "로그인 유지 방식".
 - multiSelect가 필요한 경우(에이전트가 "복수 선택 가능"으로 표시): `multiSelect: true`를 추가한다.
+
+#### Align 단계 (순차 변환 종결)
+
+순차 변환으로 모든 질문이 해소되면, 수렴된 답변을 `Q번호: 답변` 형식으로 요약하여 `맞습니다 (Recommended) / 수정 필요` 확인을 받는다.
+
+```
+AskUserQuestion(
+  question: "정리된 답변을 산출물 작성에 사용하기 전에 확인해주세요.\n\nQ1: ... → ...\nQ2: ... → ...\n...",
+  options: [
+    { value: "ok", label: "맞습니다 (Recommended)", description: "이대로 다음 단계로 진행" },
+    { value: "modify", label: "수정 필요", description: "Other로 이동해서 'Q번호: 새 답변' 형식으로 입력해주세요" }
+  ]
+)
+```
+
+"수정 필요" 시 사용자가 Other에 입력한 `Q번호: 새 답변` 패턴을 파싱하여 해당 질문만 재발사한다. 패턴 불일치 시 어떤 질문을 수정할지 선택형으로 재질의한다.
 
 #### 승인/수정 공통 패턴
 
