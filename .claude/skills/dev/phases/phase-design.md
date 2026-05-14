@@ -47,18 +47,24 @@ design-critic 결과 처리:
 
 **질문이 있으면** ("추가 확인 사항 없음"이 포함되지 않은 경우):
 - 설계 초안을 사용자에게 출력한다.
-- Agent 출력의 "확인이 필요한 사항"을 **에이전트 질문 → AskUserQuestion 변환 규칙** (SKILL.md 공유 규칙)에 따라 변환하여 사용자에게 순서대로 제시한다.
+- Agent 출력의 "확인이 필요한 사항"을 **에이전트 질문 → AskUserQuestion 변환 규칙** (SKILL.md 공유 규칙)에 따라 변환하되, **반드시 1개씩 순차 발사**하고 각 질문에 `(Recommended)` 권장 답변을 제시한다. 코드베이스로 답할 수 있는 질문은 사용자에게 묻지 않고 직접 탐색한다.
+- design-critic의 도전 사항(있으면)도 동일 규칙으로 1개씩 순차 발사한다. 단, MUST-ADDRESS 항목 표시는 Step 3의 기존 규칙대로 1개 메시지로 묶어 보여주고, 사용자 선택이 필요한 항목만 순차 발사한다.
+- 모든 질문이 해소되면 SKILL.md "Align 단계" 규칙에 따라 `Q번호: 답변` 요약 후 `맞습니다 / 수정 필요` 확인을 받는다.
 - 사용자 답변을 수렴하여 다음 반복으로 전달.
 
 **질문이 없으면** ("추가 확인 사항 없음. 설계가 완료되었습니다."):
 - **승인/수정 공통 패턴** (SKILL.md 공유 규칙)에 따라 AskUserQuestion을 사용한다:
   ```
   AskUserQuestion(
-    question: "설계를 확인해주세요.",
-    options: [
-      { value: "approve", label: "승인 — 구현 단계로 진행" },
-      { value: "modify", label: "수정 요청 — 수정할 부분을 알려주세요" }
-    ]
+    questions: [{
+      header: "설계 확인",
+      question: "설계를 확인해주세요.",
+      multiSelect: false,
+      options: [
+        { label: "승인", description: "구현 단계로 진행" },
+        { label: "수정 요청", description: "Other로 이동해서 수정할 부분을 자연어로 입력해주세요" }
+      ]
+    }]
   )
   ```
 - 승인 → phase-implement로 진행.

@@ -124,13 +124,16 @@ if findings에 QUESTION(QA)이 있으면:
     단, 첫 번째 AskUserQuestion에 "전부 넘어가기" 선택지를 추가한다:
     ```
     AskUserQuestion(
-      question: "QA 리뷰에서 확인이 필요한 사항이 N건 있습니다. 첫 번째 질문입니다: {질문}",
-      options: [
-        { value: "a", label: "선택지A" },
-        { value: "b", label: "선택지B" },
-        { value: "skip_all", label: "전부 넘어가기 — 모든 QUESTION을 기록만 하고 진행" }
-      ],
-      description: "맥락 텍스트"
+      questions: [{
+        header: "QA 질문",
+        question: "QA 리뷰에서 확인이 필요한 사항이 N건 있습니다. 첫 번째 질문입니다: {질문}",
+        multiSelect: false,
+        options: [
+          { label: "선택지A", description: "설명A" },
+          { label: "선택지B", description: "설명B" },
+          { label: "전부 넘어가기", description: "모든 QUESTION을 기록만 하고 진행" }
+        ]
+      }]
     )
     ```
     if 사용자가 "전부 넘어가기" 선택:

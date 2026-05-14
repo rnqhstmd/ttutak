@@ -1,7 +1,7 @@
 ---
 name: dev
-version: 1.1.0
-description: "PRD → 설계 → 구현 → 리뷰 → 커밋/PR까지 전체 개발 사이클을 에이전트 팀이 Q&A 루프로 수행"
+version: 1.2.0
+description: "PRD → 설계 → 구현 → 리뷰 → 커밋/PR까지 전체 개발 사이클을 에이전트 팀이 순차 Q&A 루프로 수행"
 argument-hint: "<자연어 요청>"
 allowed-tools: ["Bash(git *)", "Bash(test *)", "Bash(mkdir *)", "Bash(cp *)", "Bash(mv *)", "Bash(ls *)", "Bash(find *)", "Bash(pwd *)", "Bash(basename *)", "Bash(dirname *)", "Bash(which *)", "Bash(./gradlew *)", "Bash(gh *)", "Bash(GH_HOST= *)", "Read", "Edit", "Write", "Glob", "Grep", "Task", "AskUserQuestion", "Skill"]
 ---
@@ -56,17 +56,20 @@ BASE 추출: `{branch}에서`, `{branch} 기반`, `{branch} 브랜치`에서 bra
 
 ```
 AskUserQuestion(
-  question: "어떤 방식으로 진행할까요?",
-  options: [
-    { value: "normal", label: "전체 파이프라인 — PRD → 설계 → 구현 → 리뷰 → PR" },
-    { value: "hotfix", label: "긴급 수정 — 경량 PRD → 구현 → PR" },
-    { value: "implement", label: "구현만 — 설계 없이 바로 구현" }
-  ],
-  description: "요청: {ARGS[0]}"
+  questions: [{
+    header: "진행 방식",
+    question: "어떤 방식으로 진행할까요? (요청: {ARGS[0]})",
+    multiSelect: false,
+    options: [
+      { label: "전체 파이프라인", description: "PRD → 설계 → 구현 → 리뷰 → PR" },
+      { label: "긴급 수정", description: "경량 PRD → 구현 → PR" },
+      { label: "구현만", description: "설계 없이 바로 구현" }
+    ]
+  }]
 )
 ```
 
-- `normal` 선택 → NORMAL 모드 (전체 Phase 실행)
+- `전체 파이프라인` 선택 → NORMAL 모드 (전체 Phase 실행)
 - `hotfix` 선택 → HOTFIX 모드
 - `implement` 선택 → 경량 구현 모드: setup → implement → complete (설계/리뷰 생략, 커밋/PR은 포함)
 
@@ -465,15 +468,18 @@ Agent에게 변경사항 diff를 전달할 때, 메인 컨텍스트 절약을 �
 **유형: 선택** → AskUserQuestion 선택형:
 ```
 AskUserQuestion(
-  question: "질문 텍스트",
-  options: [
-    { value: "a", label: "레이블 — 설명" },
-    { value: "b", label: "레이블 — 설명" },
-    { value: "c", label: "직접 입력 — 위 선택지 외 직접 입력합니다" }
-  ],
-  description: "맥락 텍스트"
+  questions: [{
+    header: "카테고리",
+    question: "질문 텍스트 (맥락이 있으면 질문에 포함)",
+    multiSelect: false,
+    options: [
+      { label: "레이블A", description: "설명" },
+      { label: "레이블B", description: "설명" }
+    ]
+  }]
 )
 ```
+> 도구가 "Other" 선택지를 자동으로 제공하므로 별도 "직접 입력" 옵션을 만들지 않는다. 사용자가 Other를 선택하면 자유 입력 창이 자동으로 열린다.
 
 **유형: 자유입력** → AskUserQuestion 자유입력형:
 ```
@@ -486,21 +492,50 @@ AskUserQuestion(
 #### 변환 규칙
 
 - **(권장)** 표시가 있는 선택지는 options 배열의 첫 번째에 배치한다.
+- **모든 질문에 권장 답변을 `(Recommended)` 라벨로 제시한다.** 코드베이스/git blame/맥락에서 추정 가능하면 그 답을, 주관 영역이면 발상 기준점용 `예: {예시}` 옵션으로 대체한다.
 - **"직접 입력"** 선택지는 항상 마지막에 배치한다. 사용자가 이 옵션을 선택하면 후속 AskUserQuestion(자유입력)으로 직접 값을 받는다.
-- 질문이 **2개 이상**이면 순서대로 하나씩 AskUserQuestion을 호출한다. 이전 답변이 다음 질문의 맥락에 영향을 주는 경우 반영한다.
+- 질문이 **2개 이상**이면 **반드시 1개씩** 순서대로 AskUserQuestion을 호출한다 (배치 발사 금지). 이전 답변이 다음 질문의 맥락에 영향을 주는 경우 반영한다.
+- **코드베이스로 답할 수 있는 질문은 사용자에게 묻지 않고 직접 탐색한다** (Glob/Grep/Read).
+- **결정 의존성**: 한 답변이 후속 질문의 전제를 바꾸면 후속 질문을 재구성하거나 종속 질문을 추가한다.
 - 에이전트가 기술 용어를 사용한 경우, 사용자에게 표시할 때 **비기술적 표현으로 의역**한다. 예: "JWT vs 세션" → "로그인 유지 방식".
 - multiSelect가 필요한 경우(에이전트가 "복수 선택 가능"으로 표시): `multiSelect: true`를 추가한다.
+
+#### Align 단계 (순차 변환 종결)
+
+순차 변환으로 모든 질문이 해소되면, 수렴된 답변을 `Q번호: 답변` 형식으로 요약하여 `맞습니다 (Recommended) / 수정 필요` 확인을 받는다.
+
+```
+AskUserQuestion(
+  questions: [{
+    header: "정리 확인",
+    question: "정리된 답변을 산출물 작성에 사용하기 전에 확인해주세요.\n\nQ1: ... → ...\nQ2: ... → ...\n...",
+    multiSelect: false,
+    options: [
+      { label: "맞습니다 (Recommended)", description: "이대로 다음 단계로 진행" },
+      { label: "수정 필요", description: "Other로 이동해서 'Q번호: 새 답변' 형식으로 입력해주세요" }
+    ]
+  }]
+)
+```
+
+"수정 필요" 시 사용자가 Other에 입력한 `Q번호: 새 답변` 패턴을 파싱하여 해당 질문만 재발사한다. 패턴 불일치 시 어떤 질문을 수정할지 선택형으로 재질의한다. **Align 라운드는 최대 3회**로 제한한다. 3회 초과 시 마지막 답변으로 강제 확정하고 미해결 항목을 ❓로 기록한 뒤 다음 단계로 진행한다.
+
+> **AskUserQuestion 스키마 주의**: 도구는 `options.items.required = ["label", "description"]`만 허용하고 `value` 필드를 받지 않는다 (`additionalProperties: false`). 모든 옵션은 `label`만으로 식별하며, 사용자가 선택한 라벨이 `answers` 객체에 그대로 반환된다.
 
 #### 승인/수정 공통 패턴
 
 산출물(PRD, 설계서, 구현 계획) 확인 시 공통으로 사용하는 AskUserQuestion 패턴:
 ```
 AskUserQuestion(
-  question: "{산출물}을 확인해주세요.",
-  options: [
-    { value: "approve", label: "승인 — 다음 단계로 진행" },
-    { value: "modify", label: "수정 요청 — 수정할 부분을 알려주세요" }
-  ]
+  questions: [{
+    header: "산출물 확인",
+    question: "{산출물}을 확인해주세요.",
+    multiSelect: false,
+    options: [
+      { label: "승인", description: "다음 단계로 진행" },
+      { label: "수정 요청", description: "Other로 이동해서 수정할 부분을 자연어로 입력해주세요" }
+    ]
+  }]
 )
 ```
 사용자가 "수정 요청"을 선택하면 후속 AskUserQuestion(자유입력)으로 수정 내용을 받는다.

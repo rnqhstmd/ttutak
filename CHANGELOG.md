@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.4.0 (2026-05-14) — grill-me 순차 QA + Phase 0 공식 API 8종 + Jina Reader 재시도
+
+### Features
+- **research**: Phase 0 공식 API 8종 병행 호출 도입
+  - 카탈로그: arXiv, GitHub, Hacker News, StackOverflow, npm, PyPI, Wikipedia(한국어 → 영어 fallback 1회), Google News(KR)
+  - 키워드 정규화(lowercase + Unicode NFC) 후 신호어 substring 매칭
+  - URL의 `{키워드}` URL-encode 처리
+  - 모드 차등: 꼼꼼=매칭된 모든 카테고리, 빠르게=관련도 순 최대 2개
+  - Phase 0 응답 실패 시 Jina 재시도하지 않고 즉시 ❓ 기록
+- **research**: 차단 페이지 Jina Reader(`r.jina.ai`) 재시도 도입
+  - 응답 검증 규칙: HTTP 4xx/5xx, 길이 < 500자, 차단 시그니처 키워드 7종(`checking your browser`, `ray id`, `captcha`, `access denied`, `verify you are human`, `attention required`, `request blocked`)
+  - `cloudflare` 단독 키워드 미사용 (오탐 방지)
+  - 호출 상한: 꼼꼼 5회 / 빠르게 3회 per 리서치
+  - 서킷 브레이커: 429 또는 응답 `rate limit` 포함 시 즉시 ❓ + 추가 호출 중단
+  - 채택 시 `via Jina Reader` 표기
+- **context**: 모드 B-2(신규 도메인 Q&A)를 grill-me 패턴 순차 QA로 교체
+  - 5개 프레임을 1개씩 순차 발사 (배치 발사 금지)
+  - 모든 질문에 `(Recommended)` 권장 답변 라벨 강제 (주관 영역은 `예: {예시}` 옵션 대체 가능)
+  - 답변 평가 5분기: 명확/모호/결정 의존성/코드베이스 답변 가능/모르겠음
+  - Align 단계 신설: `Q번호: 답변` 요약 후 `맞습니다 / 수정 필요` 확인
+  - 모드 C-3-3은 B-3 dangling 참조를 새 B-2 평가 분기로 재포인팅
+- **dev**: phase-requirements / phase-design Q&A를 순차 1문 1답으로 교체
+  - SKILL.md "에이전트 질문 → AskUserQuestion 변환 규칙" 강화
+    - 모든 질문에 권장 답변 (Recommended) 강제
+    - 질문 2개 이상이면 반드시 1개씩 순차 발사
+    - 코드베이스로 답할 수 있는 질문은 직접 탐색 (Glob/Grep/Read)
+    - 결정 의존성 분기 추가
+  - 새 하위 절 "Align 단계 (순차 변환 종결)" 신설
+  - phase-design의 design-critic 도전 사항도 동일 규칙 적용 (MUST-ADDRESS 묶음 표시 + 선택 항목 순차)
+
+### Changed
+- research SKILL 버전: 1.0.0 → 1.1.0
+- context SKILL 버전: 1.0.0 → 1.1.0
+- dev SKILL 버전: 1.1.0 → 1.2.0
+
 ## v1.3.0 (2026-05-04) — cross-review 스킬 추가 + agents 디렉토리 표준화
 
 ### Fixes
