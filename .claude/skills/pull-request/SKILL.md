@@ -16,6 +16,7 @@ allowed-tools:
   - Bash(GH_HOST=github.com gh:*)
   - Bash(which:*)
   - Bash(curl:*)
+  - Bash(jq:*)
   - Bash(basename:*)
   - Bash(mktemp:*)
   - Bash(cat:*)
@@ -207,6 +208,8 @@ git diff <base-branch>...HEAD --stat
 
 PR이 성공적으로 생성되었으면:
 
+먼저 `which jq`로 JSON 인코더 설치 여부를 확인한다. 없으면 "경고: jq가 없어 PR 알림을 건너뜁니다."만 안내하고 알림 섹션을 종료한다. PR 생성 성공과 후속 작업은 유지한다.
+
 1. `.claude/config.json`의 `notifications.slack`과 선택적 `notifications.googleChat`을 확인한다. Slack이 기본 공급자이며 기존 설정을 유지한다.
    - `enabled`가 `true`이고 `webhookUrl`이 비어있지 않은 공급자만 전송한다.
    - 활성 공급자가 없으면 "알림이 설정되어 있지 않습니다. `/setup`으로 Slack 웹훅을 연동할 수 있습니다." 안내 후 건너뛴다.
@@ -215,22 +218,26 @@ PR이 성공적으로 생성되었으면:
 2. 각 활성 공급자에 전송 (`timeout: 10000`). 프로젝트명·PR URL은 JSON 인코더로 처리하고 응답 본문은 출력하지 않는다:
 
    ```bash
-   PROJECT_NAME=$(basename "$(git rev-parse --show-toplevel)")
-   TMPFILE=$(mktemp)
-   trap 'rm -f "$TMPFILE"' EXIT
-   jq -n --arg text "[$PROJECT_NAME] 새로운 PR을 확인해주세요: $PR_URL" '{text: $text}' > "$TMPFILE"
-   for PROVIDER in slack googleChat; do
-     WEBHOOK_URL=$(jq -r --arg provider "$PROVIDER" '.notifications[$provider] | select(.enabled == true) | .webhookUrl // empty' .claude/config.json)
-     [ -n "$WEBHOOK_URL" ] || continue
-     case "$PROVIDER:$WEBHOOK_URL" in
-       slack:https://hooks.slack.com/services/*|googleChat:https://chat.googleapis.com/v1/spaces/*) ;;
-       *) echo "경고: $PROVIDER 웹훅 URL 형식이 올바르지 않아 건너뜁니다." >&2; continue ;;
-     esac
-     if ! curl --max-time 10 --fail --silent --output /dev/null -X POST "$WEBHOOK_URL" \
-       -H "Content-Type: application/json; charset=utf-8" --data-binary "@$TMPFILE"; then
-       echo "경고: $PROVIDER 알림 전송에 실패했습니다." >&2
-     fi
-   done
+   if ! which jq >/dev/null 2>&1; then
+     echo "경고: jq가 없어 PR 알림을 건너뜁니다." >&2
+   else
+     PROJECT_NAME=$(basename "$(git rev-parse --show-toplevel)")
+     TMPFILE=$(mktemp)
+     trap 'rm -f "$TMPFILE"' EXIT
+     jq -n --arg text "[$PROJECT_NAME] 새로운 PR을 확인해주세요: $PR_URL" '{text: $text}' > "$TMPFILE"
+     for PROVIDER in slack googleChat; do
+       WEBHOOK_URL=$(jq -r --arg provider "$PROVIDER" '.notifications[$provider] | select(.enabled == true) | .webhookUrl // empty' .claude/config.json)
+       [ -n "$WEBHOOK_URL" ] || continue
+       case "$PROVIDER:$WEBHOOK_URL" in
+         slack:https://hooks.slack.com/services/*|googleChat:https://chat.googleapis.com/v1/spaces/*) ;;
+         *) echo "경고: $PROVIDER 웹훅 URL 형식이 올바르지 않아 건너뜁니다." >&2; continue ;;
+       esac
+       if ! curl --max-time 10 --fail --silent --output /dev/null -X POST "$WEBHOOK_URL" \
+         -H "Content-Type: application/json; charset=utf-8" --data-binary "@$TMPFILE"; then
+         echo "경고: $PROVIDER 알림 전송에 실패했습니다." >&2
+       fi
+     done
+   fi
    ```
 
 3. 알림 실패는 PR 성공을 취소하거나 작업 흐름을 중단하지 않는다. 경고만 출력한다.
