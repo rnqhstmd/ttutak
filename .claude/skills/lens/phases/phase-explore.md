@@ -1,10 +1,10 @@
 # Explore Phase: 코드 탐색
 
-현재 프로젝트에서 `Agent(subagent_type="Explore")`를 1회 호출하여 정책 구현을 탐색한다.
+현재 프로젝트에서 `Task(subagent_type="Explore")`를 1회 호출하여 정책 구현을 탐색한다.
 
 ## 1. Explore 에이전트 호출
 
-`Agent(subagent_type="Explore")` 호출.
+`Task(subagent_type="Explore")` 호출.
 
 ### 프롬프트 구성
 
@@ -117,7 +117,21 @@ Agent 완료 시:
 1. **성공 여부**를 확인한다.
 2. 성공: 출력에서 "### 발견된 구현", "### 유사 기능", "### 미발견 항목" 3개 섹션을 파싱한다.
    - 해당 섹션이 없으면 "형식 불일치"로 마킹한다.
-3. 실패: 사유를 기록한다. AskUserQuestion으로 "다시 시도" / "중단" 선택지를 제시한다.
+3. 실패: 사유를 기록한다.
+   ```
+   AskUserQuestion(
+     questions: [{
+       header: "탐색 실패",
+       question: "코드 탐색에 실패했습니다. 어떻게 진행할까요?",
+       multiSelect: false,
+       options: [
+         { label: "다시 시도", description: "동일 키워드로 재탐색합니다 (최대 1회)" },
+         { label: "중단", description: "탐색을 중단하고 현재 결과로 진행합니다" }
+       ]
+     }]
+   )
+   ```
+   "다시 시도"는 최대 1회만 허용한다. 재시도도 실패하면 "중단"으로 처리하여 현재 결과로 진행한다.
 
 결과를 `EXPLORE_RESULT` 변수에 저장한다.
 
@@ -133,4 +147,4 @@ Agent 완료 시:
 보고서를 작성합니다.
 ```
 
-Report Phase로 진행한다. `Read(phase-report.md)` + `Read(report-guide.md)`를 **같은 메시지에서 병렬 발행**한다.
+Report Phase로 진행한다. `Read(phase-report.md)` + `Read(../references/report-guide.md)`를 **같은 메시지에서 병렬 발행**한다.

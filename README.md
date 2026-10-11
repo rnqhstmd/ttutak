@@ -1,244 +1,87 @@
 <div align="center">
 
-# ttutak 뚝딱
+# Ttuk Ttak · 뚝딱
 
-**"개발해줘" 한마디면 PRD, 설계, 구현, 리뷰, 테스트, PR까지 뚝딱.**
+**아이디어를 코드로, 뚝딱.**
 
-말하면 만들어주는 Claude Code 개발 자동화 플러그인
+Claude Code와 Codex에서 PRD → 설계 → 구현 → 리뷰 → 검증 → PR까지 에이전트 팀이 처리하는 개발 자동화 플러그인.
 
-[![GitHub Pages](https://img.shields.io/badge/GitHub_Pages-2ea44f?style=for-the-badge)](https://rnqhstmd.github.io/ttutak/)
+[사용 가이드](https://rnqhstmd.github.io/ttutak/) · [Codex 가이드](docs/codex-guide.md) · [2.0.0 이식 안내](docs/migration-2.0.0.md)
 
 </div>
 
----
+## 설치와 시작
 
-## 설치
+표시 이름은 **Ttuk Ttak**, 플러그인·마켓플레이스 식별자는 **`ttuk-ttak`**입니다. 저장소 주소는 기존 `rnqhstmd/ttutak`을 유지합니다. 아래 원격 설치는 2.0.0 변경이 해당 저장소에 반영된 뒤 사용할 수 있습니다.
 
-```bash
-# Claude Code CLI에서 실행
+### Claude Code
+
+Claude Code 입력창에서 실행합니다.
+
+```text
 /plugin marketplace add rnqhstmd/ttutak
-/plugin install ttutak@ttutak
+/plugin install ttuk-ttak@ttuk-ttak
+/ttuk-ttak:setup
 ```
 
-## 시작
+기존 ttutak 사용자는 먼저 [설치 이전 절차](docs/migration-2.0.0.md#기존-설치-이전)를 진행합니다. 이름 변경으로 구형과 신형이 함께 활성화되면 훅과 스킬이 중복 실행될 수 있습니다.
+
+### Codex
+
+플러그인 관리 명령을 지원하는 Codex CLI에서 실행합니다. Windows는 `codex` 대신 `codex.cmd`를 사용합니다.
+
 ```bash
-/ttutak:setup
+codex plugin marketplace add rnqhstmd/ttutak
+codex plugin add ttuk-ttak@ttuk-ttak
+codex plugin list --json
 ```
 
----
+새 프로젝트 세션에서 `/skills`와 `/hooks`로 설치·훅 신뢰 상태를 확인합니다. 아래 문장은 **Codex 채팅창에** 입력합니다.
+
+```text
+ttuk-ttak:setup 스킬로 이 프로젝트를 준비해줘.
+ttuk-ttak:tdd --core로 이 기능을 테스트 먼저 구현해줘.
+ttuk-ttak:cross-review --advisor native로 변경사항을 검토해줘.
+ttuk-ttak:verify로 테스트와 빌드를 실행해 검증해줘.
+```
+
+환경별 설치·갱신과 권한 제약은 [Codex 가이드](docs/codex-guide.md)를 참고하세요.
 
 ## 사용법
 
-자연어로 말하면 의도에 맞는 스킬이 발동됩니다. 명령어를 외울 필요 없습니다.
+명령을 명시하거나 자연어로 요청합니다. `context`로 도메인을 등록하고, 일반 개발은 `dev`, 테스트부터 시작하는 개발은 `tdd`로 진행합니다. `--core`는 작은 변경, 전체 모드는 PRD부터 PR까지의 흐름에 사용합니다. `--ralph`는 사용자가 명시적으로 선택한 무인 반복 경로입니다.
 
-| 이렇게 말하면 | 발동 스킬 |
-|--------------|----------|
+| 요청 | 스킬 |
+|---|---|
 | "기획서 보고 context 만들어줘" | context |
-| "현재 로깅 정책 정리해줘" | lens |
+| "결제 정책 확인해줘" | lens |
 | "대시보드 기능 개발해줘" | dev |
-| "긴급 수정해줘" | dev (hotfix) |
-| "PRD만 작성해줘" | dev (단일 단계) |
-| "이어서 해줘" | dev (재개) |
-| ".dev/prd.md AI 흔적 교정해줘" | humanizer |
-| "클라우드 네이티브 트렌드 조사해줘" | research |
-| "테스트 작성해줘" | test |
+| "TDD로 로그인 검증 구현해줘" | tdd |
+| "실패 테스트 먼저 작성해줘" | red |
+| "테스트 통과시켜줘" | green |
+| "중복 제거 정리해줘" | refactor |
+| "완료 검증해줘" | verify |
+| "랄프 루프 준비해줘" | ralph |
+| "교차 리뷰 해줘" | cross-review |
+| "테스트 작성해줘" | test (기존 Spring 프로젝트용) |
 | "기술 부채 분석해줘" | tech-debt |
-| "커밋해줘" | commit |
-| "PR 만들어줘" | pull-request |
+| "커밋해줘 / PR 만들어줘" | commit / pull-request |
+| "AI 흔적 교정해줘 / 조사해줘" | humanizer / research |
 
-### 개발 흐름
+18개 스킬(`setup`, 내부 반복용 `ralph-iterate` 포함), 17개 역할 에이전트를 제공합니다. `test`는 기존 Spring 전용 테스트 작업과의 호환을 위해 유지하며, 언어 중립 개발에는 `tdd`를 사용합니다.
 
-`context` → `dev` 두 단계로 개발합니다. `dev`만 단독으로 써도 됩니다.
+작업 계획 `.dev/plan.md`에 ID가 있다면 `/ttuk-ttak:dev --work W01` 또는 `/ttuk-ttak:tdd --work W01`로 해당 범위를 실행합니다.
 
-1. `requirements/` 폴더에 기획서(PDF, 이미지, 텍스트)를 넣습니다
-2. `references/` 폴더에 준수해야 할 외부 규격 문서를 넣어두면 설계·구현·리뷰 시 자동으로 참조합니다
-3. "context 만들어줘"로 도메인 지식을 등록합니다
-4. "개발해줘"로 PRD → 설계 → 구현 → 리뷰 → 테스트 → 커밋 → PR까지 실행합니다
+## 프로젝트 설정과 안전장치
 
-각 단계 사이에 사용자 승인이 필요합니다. 승인 없이 다음으로 넘어가지 않습니다.
+`setup`은 VCS·테스트·빌드 명령을 확인합니다. 프로젝트 `.claude/config.json`에서 프로젝트 타입, 모델 프로파일, Google Chat·Slack 알림 설정을 관리합니다. 기존 사용자 값과 웹훅을 백업하고 보존한 상태에서 갱신합니다. `context/`는 도메인 지식, `references/`는 준수해야 할 규격, `.dev/`는 작업 상태·설계·의사결정 기록을 담습니다.
 
-### 외부 규격 참조
+TDD는 RED → GREEN → REFACTOR 순서를 따릅니다. `verify`는 실제 테스트·빌드 실행과 코드 지문을 기록하고, 보호 훅은 미검증·변경 후 오래된 검증 상태에서 커밋을 차단합니다. 보호 브랜치·강제 푸시·민감 파일을 점검하고 PR 머지는 사용자가 진행합니다. 알림 설정은 선택 사항입니다.
 
-프로젝트가 준수해야 할 외부 규격이 있다면 `references/` 디렉토리에 문서를 넣어둡니다:
+## 하네스 지원과 검증 범위
 
-```
-references/
-├── 시큐어코딩-가이드.md
-├── API-설계-표준.md
-└── eGovFrame/
-    └── 규칙.md
-```
+Claude Code용 스킬·에이전트와 Codex용 역할 번들·설정 템플릿·훅 어댑터를 함께 배포합니다. Codex 역할 도구 목록은 프롬프트 지침이며 실제 권한 경계를 대신하지 않습니다. 설치된 훅의 신뢰 상태와 프로젝트 테스트 명령을 확인해야 합니다.
 
-`/dev` 실행 시 설계·구현·리뷰 에이전트가 자동으로 참조합니다. 없어도 동작하지만, 등록하면 규격 준수를 자동 검증합니다.
+이 버전은 **oh-my-gx v1.33.0 (`e807c65`)**을 기반으로 ttutak의 Slack 알림·민감 파일 오탐 방지·릴리스 검사와 기존 `test` 스킬을 통합했습니다. 현재 확인 결과는 [이식 보고서](docs/migration-2.0.0.md)에 기록합니다. 과거 Windows 실행 증거는 [upstream 자료](docs/upstream-history.md)이며 이 버전의 실행 결과와 구분합니다.
 
-기존 문서를 그대로 넣어도 동작합니다. 아래는 에이전트가 더 효과적으로 참조하기 위한 권장 팁입니다:
-- 문서 상단에 요약이나 목차를 넣으면 에이전트가 필요한 부분만 탐색합니다
-- 항목에 번호/ID(§3.2 등)를 부여하면 설계서에서 정확히 참조합니다
-- 체크리스트 형태로 작성하면 QA가 항목별로 준수 여부를 검증합니다
-
----
-
-## 스킬 상세
-
-### context
-
-기획서, 요구사항 문서, 코드베이스를 분석하여 도메인 지식을 `context/{도메인}/`에 등록합니다. 등록된 context는 `dev` 실행 시 자동 참조됩니다.
-
-```
-"requirements 폴더에 있는 기획서 보고 context 만들어줘"   ← 문서 기반 생성
-"사용량 분석 도메인 등록해줘"                            ← Q&A 기반 생성
-"코드베이스 분석해서 context 자동 생성해줘"               ← 코드 스캔
-"사용량 분석 도메인 동기화해줘"                          ← git 히스토리 기반 진행도 갱신
-```
-
-### lens
-
-코드에서 비즈니스 정책을 찾아 PO/PD가 읽을 수 있는 보고서로 출력합니다. 코드를 수정하지 않습니다. 변경 아이디어를 이어서 입력하면 복잡도와 리스크 분석까지 수행합니다.
-
-```
-"현재 사용자 활동 로깅이 어떻게 되어 있는지 정리해줘"
-"로그 보관 기간을 180일로 늘리면 어디에 영향이 가?"
-```
-
-### dev
-
-자연어 요청 하나로 PRD 작성부터 PR 생성까지 전체 사이클을 수행합니다.
-
-```
-"사용량 분석 대시보드 기능 개발해줘"    ← 전체 사이클
-"집계 스케줄러 오류 긴급 수정해줘"     ← hotfix 모드 (설계/리뷰 생략)
-"PRD만 작성해줘"                     ← 특정 단계만
-"이어서 해줘"                        ← 중단 지점부터 재개
-```
-
-내부적으로 에이전트 팀이 단계를 나눠 처리합니다:
-
-| 에이전트 | 역할 | 단계 |
-|---------|------|------|
-| 제품책임자(PO) | 요구사항 구체화, PRD 작성, 인수 검증 | requirements, complete |
-| 설계자 | 기술 설계 (변경 범위, API, 구현 순서) | design |
-| 설계 비판자 | 암묵적 가정 도전, 과잉 설계 식별 | design (중형 이상) |
-| 개발자 | 설계 기반 코드 구현 | implement |
-| test 스킬 | 자기점검 후 테스트 작성 | implement |
-| QA 매니저 | 코드 리뷰 + 스펙 충족 검증 (코드+테스트 함께) | implement, review |
-| 보안 감사자 | 정책/보안/허점 교차 검증 | review |
-
-### humanizer
-
-PRD나 설계 문서에서 AI 글쓰기 패턴(40+가지)을 감지하고 교정합니다. 감지만 하는 audit 모드와 직접 수정하는 rewrite 모드를 지원합니다.
-
-```
-"/humanizer 제안서.md AI 글쓰기 흔적 교정해줘"
-"/humanizer 소스코드 기반으로 기획서.md를 작성해줘"
-"/humanizer 발표대본.md 소스코드 기반으로 발표 대본 작성해줘"
-```
-
-### research
-
-웹 검색과 문서 분석을 병행하여 도메인 리서치를 수행합니다. 결과물은 `/context --from`으로 context 문서에 반영할 수 있습니다.
-
-```
-"클라우드 네이티브 트렌드 조사해줘"              ← 종합 리포트
-"결제 시스템 비교 분석해줘 --format comparison"   ← 비교표
-"인증 방식 핵심만 정리해줘 --format summary"      ← 핵심 요약
-```
-
-조사 결과는 `.research/` 디렉토리에 저장되며, 모든 발견에 출처 URL이 명시됩니다.
-
-### test
-
-도메인별로 단위/통합/E2E 테스트를 자동 작성합니다. 기존 테스트의 구조와 코딩 스타일을 분석하여 동일한 패턴으로 생성하며, 커버리지 목표를 검증합니다.
-
-```
-"테스트 작성해줘"                              ← 변경 코드 기반 자동 감지
-"appointment 도메인 테스트 추가해줘"             ← 특정 도메인 지정
-"단위 테스트만 작성해줘 --type unit"             ← 유형 선택
-"커버리지 90% 목표로 테스트해줘 --coverage 90"   ← 커버리지 목표
-```
-
-테스트 유형별 생성 위치 (테스트 루트 하위 상대 경로 예시):
-- **단위 테스트**: `domain/{도메인}/{Entity}Test` — 엔티티, VO, 도메인 서비스
-- **통합 테스트**: `domain/{도메인}/{Service}IntegrationTest` — 서비스 계층, 리포지토리
-- **E2E 테스트**: `interfaces.api/{도메인}/{Controller}E2ETest` — API 엔드포인트
-
-test 스킬은 프로젝트 타입에 맞는 테스트 루트 경로를 자동 감지합니다 (예: Java는 `src/test`, JS/TS는 `__tests__` 또는 `*.test.*`). dev 파이프라인에서는 커밋 전에 자동 호출되고, hotfix 모드에서는 건너뜁니다.
-
-### tech-debt
-
-코드베이스의 기술 부채를 유형별로 분석하고, 우선순위 로드맵을 제공합니다. 코드를 수정하지 않는 읽기 전용 스킬입니다. 프로젝트 타입(Java, Node, Python)을 자동 감지하며, 어떤 프로젝트에서든 코드/아키텍처 분석은 동작합니다.
-
-```
-"기술 부채 분석해줘"                    ← 프로젝트 전체 분석
-"결제 도메인 부채 분석해줘"              ← 특정 도메인만
-"아키텍처 부채만 확인해줘 --type arch"   ← 유형 선택 (code, arch, deps, test)
-"의존성 점검해줘 --type deps"           ← 의존성만 분석
-```
-
-분석 유형:
-- **코드 부채**: 중복 코드, 복잡도(God 클래스), dead code, 네이밍 불일치
-- **아키텍처 부채**: 순환 의존성, 레이어 위반, 책임 분리 위반
-- **의존성 부채**: EOL 프레임워크, 보안 취약점, 미고정 버전
-- **테스트 부채**: 커버리지 부족, 핵심 로직 미검증, assertion 없는 테스트
-
-결과는 Health Score(A~F 등급)와 우선순위 로드맵으로 제공됩니다. `context/`가 등록되어 있으면 의도된 아키텍처와 실제 구조를 비교하여 더 정확한 진단이 가능합니다.
-
-### commit / pull-request
-
-```
-"커밋해줘"      ← 브랜치명에서 타입 파싱, 변경사항 분석, 한국어 커밋 메시지 생성
-"PR 만들어줘"   ← 커밋 히스토리 분석, PR 제목/본문 자동 생성
-```
-
----
-
-## 안전장치
-
-- PR 생성까지만 자동화합니다. **PR 머지는 사용자가 직접** 수행합니다.
-- `git push --force`, `gh pr merge`는 설정 수준에서 차단됩니다.
-- 보호 브랜치(main)에서 직접 커밋을 차단합니다.
-- 커밋 전 민감 파일(`.env`, `*.key`, `*.pem`, `credentials*`, `*secret*`) 감지 시 경고합니다.
-- 빌드 아티팩트(`build/`, `node_modules/` 등)가 tracked 상태이면 자동으로 `.gitignore` 보강을 제안합니다.
-
----
-
-## Slack 알림
-
-`/ttutak:setup`에서 Slack Incoming Webhook을 연동하면 PR 생성 시 채널에 자동 알림이 전송됩니다. 한 명이 설정하고 커밋하면 팀 전체가 받습니다.
-```
-[{프로젝트 이름}] 새로운 PR을 확인해주세요: {PR 주소}
-[ttutak] 새로운 PR을 확인해주세요: https://github.com/rnqhstmd/ttutak/pull/1
-```
-
----
-
-## FAQ
-
-<details>
-<summary><b>context 없이도 dev를 실행할 수 있나요?</b></summary>
-
-네. 없어도 동작합니다. 다만 context를 등록하면 AI가 도메인 용어를 정확히 이해하여 더 정확한 코드를 생성합니다.
-</details>
-
-<details>
-<summary><b>dev를 실행하면 바로 코드를 짜나요?</b></summary>
-
-아닙니다. PO 에이전트가 먼저 Q&A로 요구사항을 구체화하고(PRD), 설계자가 기술 설계를 거친 뒤 사용자가 승인해야 구현에 들어갑니다. 각 단계마다 선택형/자유입력형 질문으로 확인을 받습니다.
-</details>
-
-<details>
-<summary><b>dev 도중에 멈추면 처음부터 다시 해야 하나요?</b></summary>
-
-아닙니다. "이어서 해줘"라고 말하면 `.dev/state.md`에 저장된 진행 상태를 기반으로 중단된 단계부터 재개합니다.
-</details>
-
-<details>
-<summary><b>PR이 자동으로 머지되나요?</b></summary>
-
-아닙니다. PR 생성까지만 자동화합니다. `gh pr merge`는 설정 수준에서 차단되어 있습니다.
-</details>
-
-<details>
-<summary><b>플러그인 업데이트는?</b></summary>
-
-`/plugin marketplace update ttutak`
-</details>
+상세 참고: [전체 가이드](docs/guide.md), [TDD 가이드](docs/tdd-guide.md), [프롬프트 예시](docs/prompt-examples.md), [테스트 하네스](docs/test-harness-guide.md), [변경 이력](CHANGELOG.md).

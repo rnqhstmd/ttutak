@@ -1,7 +1,6 @@
 ---
 name: commit
-version: 1.0.0
-description: 브랜치 타입 기반 한국어 커밋 메시지로 Git 커밋. 민감 파일 감지 포함
+description: 브랜치 타입을 파싱하여 한국어 커밋 메시지를 생성한다. "커밋", "commit" 시 사용.
 argument-hint: [커밋 메시지]
 allowed-tools:
   # git - 커밋 핵심
@@ -36,24 +35,37 @@ Arguments:
 - 인자 없음: 타입은 브랜치에서 파싱, 메시지는 변경 내용에서 자동 생성
 - ARGS[0]만: 커밋 메시지로 사용. 타입은 브랜치에서 파싱
 
+**하네스 적응**: 이 문서는 Claude Code 도구명으로 서술한다. 다른 하네스에서 실행 중이면 아래 대응으로 옮겨 수행한다.
+
+Codex에서는 먼저 `Read("../dev/references/codex-runtime.md")`로 공통 실행 규약을 읽고, 이 스킬의 절차·게이트를 유지한다. 상대경로는 이 SKILL.md 위치 기준이다.
+Codex 지문 helper의 설치 경로는 **이 SKILL.md 디렉토리 기준** [../../../scripts/codex-fingerprint.py](../../../scripts/codex-fingerprint.py)다. 실제 설치된 SKILL.md 절대경로 `SKILL_PATH`에 대해 `Path(SKILL_PATH).resolve().parents[3]`가 `GX_PLUGIN_ROOT`이며, `.codex-plugin/plugin.json`과 helper의 존재를 확인한다. Windows PowerShell: `$skillPath = (Resolve-Path -LiteralPath '<installed SKILL.md>').Path; $pluginRoot = (Resolve-Path -LiteralPath (Join-Path (Split-Path -Parent $skillPath) '..\..\..')).Path; $helper = (Resolve-Path -LiteralPath (Join-Path $pluginRoot 'scripts/codex-fingerprint.py')).Path`. 아래 지문 명령의 `<GX_PLUGIN_ROOT>`는 이 경로로만 치환하고, Windows에서는 확인한 `$helper` 절대경로를 사용한다.
+Codex on Windows: read this SKILL.md and referenced files as UTF-8; use `Get-Content -Encoding UTF8`.
+
+- `AskUserQuestion` → `request_user_input`. 그 도구를 쓸 수 없으면 자연어로 묻되, **승인 없이 다음 단계로 넘어가지 않는다**는 계약은 그대로 지킨다.
+
+도구 이름이 다르다는 이유로 게이트를 건너뛰지 않는다. 확인·검증 단계는 하네스와 무관하게 유지한다.
+
+## VCS 가드
+
+`.claude/config.json`의 `"vcs"` 필드를 확인한다.
+- `"svn"` → 즉시 종료: "SVN 프로젝트에서는 /commit을 지원하지 않습니다. `svn commit`을 직접 실행해주세요." 출력.
+- `"git"` 또는 `""` (미설정) → 아래 절차를 계속 진행한다.
+
 ## 사전 확인
-
-### Step 0: config 로드 (필수)
-
-- `test -f .claude/config.json`으로 존재 확인.
-- **부재 시**: "`.claude/config.json`이 없습니다. `/ttutak:setup`을 실행하여 초기 설정을 완료하세요." 출력 후 **즉시 종료**.
-- **존재 시**: Read하여 `projectTypes`, `sensitiveFilePatterns`, `buildArtifactPatterns`, `timeouts` 를 변수에 로드. JSON 파싱 실패 시 "config.json이 손상되었습니다." 경고 후 중단.
-
-### Step 1: 기본 검증
 
 - Git 저장소인지 확인
 - **작업 디렉토리 보정**: `git rev-parse --show-toplevel`로 Git 루트를 확인한다. 현재 디렉토리와 다르면 (워크스페이스 root에서 호출된 경우 등), 이후 모든 git/빌드 명령을 Git 루트 기준 서브셸 `(cd <git-root> && <명령>)`로 실행한다.
+- **보호 브랜치 선행 중단**: 현재 브랜치를 먼저 확인한다. `main`/`master`/`develop` 또는 detached HEAD이면 빌드·스테이징·커밋을 하지 않고 작업 브랜치가 필요하다고 안내하며 종료한다. 훅 로드 여부와 관계없이 적용한다.
 - 커밋할 변경사항이 있는지 확인 (없으면: "커밋할 변경사항이 없습니다.")
+- **verify 게이트 (tdd·ralph)**: Git 루트 기준 `.dev/{branch-slug}/state.md`(branch-slug = `git branch --show-current` 결과의 `/`를 `-`로 치환)가 존재하고 `pipeline: tdd` 또는 `pipeline: ralph`이며 `status: in_progress`이고 **(a) `verify-status`가 `passed`가 아니거나 (b) `verify-fingerprint`가 기록되어 있는데 현재 코드 지문과 트리 성분이 다르면**(=verify 통과 후 코드가 바뀜 — HEAD 성분은 참고용이며, 검증된 코드가 그대로 커밋되어 HEAD만 전진한 경우는 일치로 간주한다) verify 게이트 미통과(또는 통과 후 코드 변경) 상태다. **Codex에서는 verify 수행을 안내하고 빌드·스테이징·커밋 전에 중단한다. 사용자 질문이나 위험 수용만으로 미통과를 통과로 취급하지 않는다.** Claude Code에서는 기존 경고·사용자 위험 수용 분기를 유지하되, 위 보호 브랜치 중단을 먼저 적용한다. `pipeline: ralph`이면 러너 재실행 또는 verify 통과를 우선 안내한다.
+  - **지문 계산 규약** (훅·verify와 동일): 임시 인덱스에 워킹트리 전체를 `add -A`한 뒤 `.dev`를 인덱스에서 제거하고 `write-tree`한 **트리 해시**(앞 12자)를 `git rev-parse --short HEAD`와 `:`로 이은 값 (스테이징 여부와 무관하도록 트리 해시를 쓴다 — `git diff HEAD`는 신규 파일이 스테이징되면 값이 바뀐다). `.dev/`를 제외하는 이유는 파이프라인 산출물이 코드가 아니며, 포함하면 상태 기록 때마다 지문이 스스로 무효화되기 때문이다. **대조는 트리 성분(콜론 뒤 12자)만 수행한다** — HEAD 성분은 기록·추적용이며, 커밋으로 HEAD가 전진해도 트리가 같으면 일치다.
+  - **Codex 계산 경로**: 설치된 Ttuk Ttak 플러그인 루트의 `scripts/codex-fingerprint.py` 존재를 확인하고, `git rev-parse --show-toplevel`로 얻은 소비 프로젝트 절대경로를 `--cwd`에 전달한다. Windows는 확인된 Python 3.10+로 `python "<GX_PLUGIN_ROOT>/scripts/codex-fingerprint.py" --cwd "<PROJECT_ROOT>"`, Linux는 `python3 "$GX_PLUGIN_ROOT/scripts/codex-fingerprint.py" --cwd "$PROJECT_ROOT"`를 실행한다. **exit 0과 stdout의 정확한 한 줄 `^[0-9a-f]+:[0-9a-f]{12}$`**을 확인한 뒤 **트리 성분만** state.md와 대조한다. helper 실패·부재·빈/잘못된 출력이면 커밋 전에 중단한다. Codex에서 임시 인덱스 직접 Git 명령으로 대체하지 않는다. `git add`/`write-tree`가 실제 `.git/objects`에도 쓰기 때문이다. Claude Code는 위 기존 계산을 유지한다.
+  - `verify-fingerprint` 필드가 없는 구 세션은 (a)만 판정한다 (하위 호환). `pipeline` 필드가 없거나 다른 값인 state.md(dev 등)에는 적용하지 않는다.
 - 커밋 전에 빌드를 실행한다:
-  - Step 0에서 로드한 `projectTypes`에서 프로젝트 타입을 감지한다 (빌드/설정 파일 기준).
+  - `.claude/config.json`의 `projectTypes`에서 프로젝트 타입을 감지한다 (빌드/설정 파일 기준).
   - 감지된 프로젝트 타입의 `build` 명령을 실행한다.
   - 빌드 실패 시 커밋을 중단하고 사용자에게 보고.
-  - 타임아웃: build Bash 명령에 `timeout: 300000` (5분) 파라미터를 설정한다. 초과 시 해당 단계를 건너뛰고 사용자에게 보고.
+  - 타임아웃: build Bash 명령에 `timeout: 300000` (5분, config.json `timeouts.build` 값) 파라미터를 설정한다. 초과 시 해당 단계를 건너뛰고 사용자에게 보고.
 
 ## 타입 파싱
 
@@ -61,7 +73,22 @@ Arguments:
 1. `git branch --show-current`로 브랜치명 확인
 2. 첫 번째 `/` 앞의 세그먼트를 타입으로 사용 (예: `feat/login` → `feat`)
 3. 허용 타입: `.claude/config.json` → `conventions.branchTypes` 참조
-4. 브랜치명에서 타입을 추출할 수 없으면 (main, develop 등): AskUserQuestion으로 타입을 선택받는다
+4. 브랜치명에서 타입을 추출할 수 없으면 (예: `release-without-prefix`; 보호 브랜치는 사전 확인에서 이미 중단):
+   ```
+   AskUserQuestion(
+     questions: [{
+       header: "커밋 타입",
+       question: "브랜치명에서 타입을 추출할 수 없습니다. 커밋 타입을 선택해주세요.",
+       multiSelect: false,
+       options: [
+         { label: "feat", description: "새 기능" },
+         { label: "fix", description: "버그 수정" },
+         { label: "refactor", description: "리팩토링" },
+         { label: "Other로 입력", description: "Other로 이동해서 다른 타입(docs, test, chore 등)을 자연어로 입력해주세요" }
+       ]
+     }]
+   )
+   ```
 
 ## 커밋 메시지 생성
 
@@ -71,7 +98,7 @@ Arguments:
 3. 어떤 파일이 수정/추가/삭제되었는지 파악
 
 **메시지 구조**:
-- **제목 (첫 줄)**: `{type}: {한국어 요약}`. 50자 이내.
+- **제목 (첫 줄)**: `{type}: {한국어 요약}` (config.json `conventions.commitFormat` 형식). 50자 이내.
   - 예: `feat: 로그인 기능 추가`
 - **본문 (빈 줄 이후)**: 구체적 변경사항을 `-` bullet으로 나열
 
@@ -87,13 +114,13 @@ feat: 로그인 기능 추가
 ## 커밋 실행
 
 0. `git diff --cached --name-only`로 기존 staged 파일 목록을 캡처한다. (커밋 실패 시 원래 staged 상태를 복원하기 위함)
-1. `git status --short`로 변경 파일 목록을 확인하고, 목록을 사용자에게 표시한다.
-2. 빌드 아티팩트 패턴(`.claude/config.json` → `buildArtifactPatterns` 참조)이 tracked 파일 목록에 있으면: `.gitignore` 파일이 존재하는지 `test -f .gitignore`로 먼저 확인한다. 파일이 존재하면 해당 패턴이 `.gitignore`에 있는지 grep으로 확인하고, 있으면 `git rm -r --cached <pattern>`으로 tracking을 해제한다. `.gitignore`가 없거나 패턴이 없으면 사용자에게 `.gitignore` 생성/추가 여부를 확인한다. **주의: 반드시 `--cached` 플래그를 사용할 것. `--cached` 없이 `git rm`을 실행하면 파일이 삭제된다.**
-3. 민감 파일 패턴(`.claude/config.json` → `sensitiveFilePatterns` 참조)이 목록에 있으면 사용자에게 경고하고 스테이징에서 제외할지 확인한다. 패턴은 **파일 basename 기준 glob match**로 평가한다 (예: `*.secret`은 `config.secret`에는 매칭되지만 `secretary.md`에는 매칭되지 않는다).
+1. `git status --short`로 변경 파일 목록을 확인하고, 목록을 사용자에게 표시한다. 목록에 **현재 브랜치 슬러그가 아닌 `.dev/{다른-slug}/`** 경로가 있으면 다른 작업의 잔재일 수 있으므로 포함 여부를 사용자에게 확인한다.
+2. 빌드 아티팩트 패턴(`.claude/config.json`의 모든 `projectTypes.*.artifacts`와 레거시 `buildArtifactPatterns`의 **합집합** — 타입별 artifacts가 SSOT)이 tracked 파일 목록에 있으면: `.gitignore` 파일이 존재하는지 `test -f .gitignore`로 먼저 확인한다. 파일이 존재하면 해당 패턴이 `.gitignore`에 있는지 grep으로 확인하고, 있으면 `git rm -r --cached <pattern>`으로 tracking을 해제한다. `.gitignore`가 없거나 패턴이 없으면 사용자에게 `.gitignore` 생성/추가 여부를 확인한다. **주의: 반드시 `--cached` 플래그를 사용할 것. `--cached` 없이 `git rm`을 실행하면 파일이 삭제된다.**
+3. 민감 파일 패턴(`.claude/config.json` → `sensitiveFilePatterns` 참조)은 각 변경 파일의 **파일명(basename)에 glob 매칭**한다. 문자열 포함 검사로 해석하지 않는다 (`.env*`는 `.env.local`에 매칭하고 `Environment.java`에는 매칭하지 않는다). 매칭된 파일이 목록에 있으면 사용자에게 경고하고 스테이징에서 제외할지 확인한다.
 4. 변경 파일이 20개를 초과하면 사용자에게 전체 스테이징 여부를 확인한다.
 5. 스테이징:
-   - 제외 파일 없음: `git add -A`
-   - 제외 파일 있음: `git add <나머지 파일 각각 지정>`
+   - 제외 파일 없음: `git add -A` 후 런타임 파일을 unstage한다: `git reset -q -- '.dev/*/ralph.lock' '.dev/*/iter-*.log' 2>/dev/null` (루프 락·반복 로그는 커밋 대상이 아니다 — 커밋되면 다른 사용자의 라우팅·게이트 판별이 오작동한다)
+   - 제외 파일 있음: `git add <나머지 파일 각각 지정>` (위 런타임 파일은 지정하지 않는다)
 6. HEREDOC 포맷으로 커밋:
    ```bash
    git commit -m "$(cat <<'EOF'
@@ -115,13 +142,21 @@ feat: 로그인 기능 추가
 2. `context/*/PROJECTS.md`를 Glob으로 탐색한다. 없으면 건너뛴다.
 3. 각 `PROJECTS.md`를 Read하여 프로젝트 매핑(소스 경로 패턴)을 파싱한다.
 4. 커밋된 파일 목록(`git diff --name-only HEAD~1..HEAD`)과 각 도메인의 소스 경로 패턴을 대조한다.
-5. 매칭되는 도메인이 있으면 AskUserQuestion:
+5. 매칭되는 도메인이 있으면:
    ```
-   "{도메인} 도메인(context/{도메인}/)과 관련된 파일이 변경되었습니다.
-   context를 동기화할까요?"
+   AskUserQuestion(
+     questions: [{
+       header: "context 동기화",
+       question: "{도메인} 도메인(context/{도메인}/)과 관련된 파일이 변경되었습니다. context를 동기화할까요?",
+       multiSelect: false,
+       options: [
+         { label: "동기화", description: "context 동기화 안내를 출력합니다" },
+         { label: "건너뛰기", description: "동기화하지 않고 진행합니다" }
+       ]
+     }]
+   )
    ```
-   - 옵션: "예 — context 동기화" / "아니오 — 건너뜀"
-   - "예" 선택 시: 안내만 출력한다. "`/ttutak:context {도메인} 동기화해줘`로 동기화할 수 있습니다." (commit 스킬 내에서 context 스킬을 직접 실행하지 않는다)
+   - "동기화" 선택 시: 안내만 출력한다. "`/context {도메인} 동기화해줘`로 동기화할 수 있습니다." (commit 스킬 내에서 context 스킬을 직접 실행하지 않는다)
 6. 매칭되는 도메인이 없으면 이 단계를 건너뛴다.
 
 **금지**: `Co-Authored-By` 라인을 절대 추가하지 말 것.

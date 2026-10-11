@@ -1,7 +1,6 @@
 ---
 name: lens
-version: 2.0.0
-description: 현재 프로젝트의 코드에서 비즈니스 정책을 탐지하고, 변경 시 영향도를 분석하여 PO/PD 친화적 보고서로 제공 (읽기 전용)
+description: 코드에서 비즈니스 정책을 탐지하여 영향도를 분석한다. "정책 확인", "영향도" 시 사용.
 argument-hint: <자연어 쿼리> [--detail] [--idea "<아이디어>"]
 allowed-tools:
   # filesystem (읽기 전용)
@@ -13,18 +12,30 @@ allowed-tools:
   - Bash(wc *)
   - Bash(date *)
   - Bash(git rev-parse *)
+  - Bash(svn info *)
   # read tools
   - Read
   - Glob
   - Grep
   # orchestration
-  - Agent
+  - Task
   - AskUserQuestion
 ---
 
 lens 오케스트레이터. PO/PD가 자연어로 질의하면, **현재 프로젝트**에서 해당 정책의 코드 구현 현황을 비즈니스 친화적 보고서로 제공한다.
 
 ---
+
+**하네스 적응**: 이 문서는 Claude Code 도구명으로 서술한다. 다른 하네스에서 실행 중이면 아래 대응으로 옮겨 수행한다.
+
+Codex에서는 먼저 `Read("../dev/references/codex-runtime.md")`로 공통 실행 규약을 읽고, 이 스킬의 절차·게이트를 유지한다. 상대경로는 이 SKILL.md 위치 기준이다.
+Codex on Windows: read this SKILL.md and referenced files as UTF-8; use `Get-Content -Encoding UTF8`.
+
+- `AskUserQuestion` → `request_user_input`. 그 도구를 쓸 수 없으면 자연어로 묻되, **승인 없이 다음 단계로 넘어가지 않는다**는 계약은 그대로 지킨다.
+- `Task(subagent_type="ttuk-ttak:{name}")` → 공통 실행 규약의 `codex-roles/index.json`과 역할 본문·도구 제약을 읽어 `spawn_agent`의 message에 태스크 prompt 전문과 함께 전달한다. 격리 시 `fork_turns: "none"`을 쓴다.
+- `Task(subagent_type="Explore")` → `spawn_agent`의 읽기 전용 탐색 에이전트. 대응 타입이 없으면 디스패치를 접고 오케스트레이터가 `Grep`·`Read`로 직접 탐색한다 — 탐색 범위와 보고 항목은 그대로 유지한다.
+
+도구 이름이 다르다는 이유로 게이트를 건너뛰지 않는다. 확인·검증 단계는 하네스와 무관하게 유지한다.
 
 ## 페르소나
 
@@ -61,8 +72,9 @@ lens 오케스트레이터. PO/PD가 자연어로 질의하면, **현재 프로�
 
 ## 스킬 참조 경로
 
-이 스킬의 파일들은 프로젝트 루트의 `.claude/skills/lens/` 하위에 위치한다.
-Phase 파일이나 참조 파일을 Read할 때, 현재 작업 디렉토리(프로젝트 루트)를 기준으로 절대 경로를 구성한다.
+**번들 파일 경로 규약**: 이 스킬의 phase·참조 파일은 이 SKILL.md와 같은 디렉토리 아래에 있다. **그 지시가 적힌 파일의 위치를 기준으로 한 상대경로**로 Read한다 — 하네스가 플러그인을 어디에 설치하든(Claude Code의 플러그인 캐시, Codex의 스킬 루트) 파일 사이의 상대 위치는 같으므로 경로가 어긋나지 않는다.
+- 예: `Read("phases/phase-prepare.md")`
+- 상대경로 Read가 실패하면, 하네스가 알려준 이 SKILL.md의 절대경로에서 디렉토리 부분을 떼어 앞에 붙인 뒤 다시 시도한다.
 
 ## 인자
 
@@ -81,16 +93,16 @@ ARGS[0]이 `--`로 시작하면 다음을 응답:
 | Phase | 파일 | 수행 방식 | 설명 |
 |-------|------|-----------|------|
 | Prepare | `phase-prepare.md` | inline | 쿼리에서 키워드 추출 → 현재 프로젝트 확정 |
-| Explore | `phase-explore.md` | Agent(Explore) | 현재 프로젝트에서 정책 구현 발견 |
+| Explore | `phase-explore.md` | Task(Explore) | 현재 프로젝트에서 정책 구현 발견 |
 | Report | `phase-report.md` | inline | 정책 보고서 합성 → 아이디어 질문 |
-| Impact | `phase-impact.md` | Agent 병렬 (architect + security-auditor) | 복잡도 + 리스크 분석 (`--idea` 또는 사용자 응답 시) |
+| Impact | `phase-impact.md` | Task 병렬 (architect + security-auditor) | 복잡도 + 리스크 분석 (`--idea` 또는 사용자 응답 시) |
 | Impact-Report | `phase-impact-report.md` | inline | 복잡도 + 리스크 합성 → PO 보고서 |
 
 ## Phase 라우팅
 
 Phase에 진입할 때 **반드시** 해당 Phase 파일을 Read한 후 실행한다:
 ```
-Read(`<프로젝트 루트>/.claude/skills/lens/phases/phase-<name>.md`)
+Read(`phases/phase-<name>.md`)
 ```
 Phase 파일의 지시에 따라 실행하고, 완료 후 다음 Phase로 진행한다.
 

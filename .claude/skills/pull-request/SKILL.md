@@ -1,7 +1,6 @@
 ---
 name: pull-request
-version: 1.0.0
-description: 커밋 히스토리에서 제목과 본문을 자동 생성하여 PR 생성
+description: 커밋 히스토리를 분석하여 PR을 자동 생성한다. "PR", "PR 올려", "풀리퀘" 시 사용.
 argument-hint: [base-branch]
 allowed-tools:
   - Read
@@ -16,28 +15,75 @@ allowed-tools:
   # GH_HOST=<host> gh <cmd> 형태의 환경변수 prefix 명령 허용 (GHE 호스트 지정 시 사용)
   - Bash(GH_HOST=github.com gh:*)
   - Bash(which:*)
-  - Bash(brew install:*)
-  - Bash(curl *)
+  - Bash(curl:*)
+  - Bash(basename:*)
+  - Bash(mktemp:*)
+  - Bash(cat:*)
+  - Bash(rm -f:*)
   - AskUserQuestion
 ---
 
 현재 브랜치의 커밋 히스토리를 분석하여 PR을 자동 생성한다.
 
+**하네스 적응**: 이 문서는 Claude Code 도구명으로 서술한다. 다른 하네스에서 실행 중이면 아래 대응으로 옮겨 수행한다.
+
+Codex에서는 먼저 `Read("../dev/references/codex-runtime.md")`로 공통 실행 규약을 읽고, 이 스킬의 절차·게이트를 유지한다. 상대경로는 이 SKILL.md 위치 기준이다.
+Codex 지문 helper의 설치 경로는 **이 SKILL.md 디렉토리 기준** [../../../scripts/codex-fingerprint.py](../../../scripts/codex-fingerprint.py)다. 실제 설치된 SKILL.md 절대경로 `SKILL_PATH`에 대해 `Path(SKILL_PATH).resolve().parents[3]`가 `GX_PLUGIN_ROOT`이며, `.codex-plugin/plugin.json`과 helper의 존재를 확인한다. Windows PowerShell: `$skillPath = (Resolve-Path -LiteralPath '<installed SKILL.md>').Path; $pluginRoot = (Resolve-Path -LiteralPath (Join-Path (Split-Path -Parent $skillPath) '..\..\..')).Path; $helper = (Resolve-Path -LiteralPath (Join-Path $pluginRoot 'scripts/codex-fingerprint.py')).Path`. 아래 지문 명령의 `<GX_PLUGIN_ROOT>`는 이 경로로만 치환하고, Windows에서는 확인한 `$helper` 절대경로를 사용한다.
+Codex on Windows: read this SKILL.md and referenced files as UTF-8; use `Get-Content -Encoding UTF8`.
+
+- `AskUserQuestion` → `request_user_input`. 그 도구를 쓸 수 없으면 자연어로 묻되, **승인 없이 다음 단계로 넘어가지 않는다**는 계약은 그대로 지킨다.
+
+도구 이름이 다르다는 이유로 게이트를 건너뛰지 않는다. 확인·검증 단계는 하네스와 무관하게 유지한다.
+
+## VCS 가드
+
+`.claude/config.json`의 `"vcs"` 필드를 확인한다.
+- `"svn"` → 즉시 종료: "SVN 프로젝트에서는 /pull-request를 지원하지 않습니다. SVN은 PR 개념이 없으므로 커밋 후 리뷰어에게 직접 알려주세요." 출력.
+- `"git"` 또는 `""` (미설정) → 아래 절차를 계속 진행한다.
+
 Arguments:
 - ARGS[0] (optional): 베이스 브랜치. 미지정 시 자동 감지:
   1. `git branch --list main master develop`로 존재하는 브랜치 확인
-  2. 존재하는 브랜치가 **2개 이상**이면 → AskUserQuestion으로 사용자에게 선택지 제시 (예: main, develop)
+  2. 존재하는 브랜치가 **2개 이상**이면 → 다음과 같이 선택을 요청한다:
+     ```
+     AskUserQuestion(
+       questions: [{
+         header: "베이스 브랜치",
+         question: "어떤 브랜치를 베이스로 사용할까요?",
+         multiSelect: false,
+         options: [
+           { label: "<감지된 브랜치 1>", description: "예: main" },
+           { label: "<감지된 브랜치 2>", description: "예: develop" }
+         ]
+       }]
+     )
+     ```
   3. 존재하는 브랜치가 **1개**이면 → 해당 브랜치를 베이스로 자동 선택
-  4. 하나도 없으면 → AskUserQuestion(자유입력)으로 직접 입력 요청
+  4. 하나도 없으면 → 다음과 같이 직접 입력을 요청한다:
+     ```
+     AskUserQuestion(
+       questions: [{
+         header: "베이스 브랜치",
+         question: "main/master/develop 브랜치가 감지되지 않았습니다. 베이스 브랜치명을 입력해주세요.",
+         multiSelect: false,
+         options: [
+           { label: "Other로 입력", description: "Other로 이동해서 베이스 브랜치명을 자연어로 입력해주세요" },
+           { label: "취소", description: "PR 생성을 중단합니다" }
+         ]
+       }]
+     )
+     ```
+     - Other로 입력된 브랜치명 → 해당 브랜치를 베이스로 사용.
+     - "취소" → "베이스 브랜치 미확정으로 PR 생성을 중단합니다." 출력 후 **즉시 종료**.
+- `--background <파일경로>` (optional): Background 섹션에 반영할 비즈니스 맥락 파일. 지정 시 해당 파일을 Read하여 "배경"과 "요구사항"을 Background 섹션에 포함한다. git log 기반 배경과 함께 병합하여 작성.
+- `--extra-section <파일경로>` (optional): Checklist 앞에 삽입할 추가 섹션 파일. 지정 시 해당 파일을 Read하여 요약본을 Checklist 직전에 삽입한다. 파일에 `## Rulings`·`## Deferred` 절이 있으면 요약하지 않고 같은 제목의 절로 항목을 **그대로** 옮긴다 — 판정 목록은 사용자가 되돌릴 근거라 항목이 빠지면 안 된다. (예: Trust Ledger → `## Audit Summary` 섹션 생성)
 
 ## 사전 확인 (반드시 순차 실행)
 
 **Step 1** (게이트 — 반드시 순차 실행):
 
 1. `which gh`로 gh CLI 존재 확인.
-   - **없으면**: AskUserQuestion — "gh CLI가 설치되어 있지 않습니다. 설치할까요?"
-     - 예 → `brew install gh` 실행 (`timeout: 300000`). 설치 실패 시 "gh 설치에 실패했습니다. PR 생성을 건너뜁니다." 출력 후 **즉시 종료**.
-     - 아니오 → "PR 생성을 건너뜁니다. 수동으로 PR을 생성해주세요." 출력 후 **즉시 종료**.
+   - **없으면**: "gh CLI가 설치되어 있지 않습니다. `/setup`을 먼저 실행해주세요." 출력 후 **즉시 종료**.
 
 2. `gh auth status`로 인증 확인.
    - **미인증이면**: "gh 인증이 필요합니다. `gh auth login`을 실행하겠습니다." 안내 후 `gh auth login` 실행.
@@ -52,6 +98,8 @@ Arguments:
 - 현재 브랜치가 베이스 브랜치가 아닌지 확인 — 같으면: "베이스 브랜치에서는 PR을 생성할 수 없습니다."
 - 베이스 브랜치 대비 커밋이 있는지 확인 — 없으면: "PR을 생성할 커밋이 없습니다."
 - 미커밋 변경사항이 있으면 경고하고, 커밋 먼저 할지 진행할지 확인
+- **verify 경고 게이트 (tdd·ralph)**: Git 루트 기준 `.dev/{branch-slug}/state.md`(branch-slug = 현재 브랜치명의 `/`를 `-`로 치환)가 존재하고 `pipeline: tdd` 또는 `pipeline: ralph`이며 `status: in_progress`이고 **(a) `verify-status`가 `passed`가 아니거나 (b) `verify-fingerprint`가 기록되어 있는데 현재 코드 지문과 트리 성분이 다르면**(=verify 통과 후 코드가 바뀜 — HEAD 성분은 참고용이며, 검증된 코드가 그대로 커밋되어 HEAD만 전진한 경우는 일치로 간주한다) — verify 게이트 미통과(또는 통과 후 코드 변경) 상태의 PR이다. 사용자에게 경고하고 진행 여부를 확인한다 (진행 시 PR 본문 Checklist에 "verify 미통과 PR" 또는 "verify 통과 후 변경 PR"을 명시). `pipeline: ralph`이면 루프 중단 잔여 상태다 — 러너 재실행(루프 재개) 또는 `ttuk-ttak:verify` 통과 후 PR을 우선 안내한다. 지문 계산 규약은 commit의 verify 경고 게이트 항목과 동일하며, `verify-fingerprint`가 없는 구 세션은 (a)만 판정한다. `pipeline` 필드가 없거나 다른 값인 state.md(dev 등)에는 적용하지 않는다.
+- **Codex 지문 계산·중단**: 위 게이트에서 현재 코드 지문이 필요하면 설치된 Ttuk Ttak 플러그인 루트의 `scripts/codex-fingerprint.py`를 확인하고, `git rev-parse --show-toplevel`로 확인한 소비 프로젝트 절대경로로 `--cwd`를 지정한다. Windows는 확인된 Python 3.10+로 `python "<GX_PLUGIN_ROOT>/scripts/codex-fingerprint.py" --cwd "<PROJECT_ROOT>"`, Linux는 `python3 "$GX_PLUGIN_ROOT/scripts/codex-fingerprint.py" --cwd "$PROJECT_ROOT"`를 실행한다. **exit 0과 stdout의 정확한 한 줄 `^[0-9a-f]+:[0-9a-f]{12}$`**을 확인한 뒤 **트리 성분만** state.md와 대조한다. helper 부재·실패·빈/잘못된 출력이면 Codex에서 PR 실행을 중단한다. Codex에서는 `verify-status` 미통과나 트리 성분 불일치도 verify를 안내하고 PR 실행 전에 중단하며, 사용자 위험 수용만으로 넘기지 않는다. 임시 인덱스 직접 Git 명령은 `.git/objects` 쓰기를 일으키므로 Codex에서 사용하지 않는다. Claude Code는 위 기존 계산·위험 수용 분기를 유지한다.
 
 ## GH_HOST 감지
 
@@ -93,20 +141,13 @@ git diff <base-branch>...HEAD --stat
 - 커밋 50개 이하: 전체 log로 본문 작성
 - 커밋 50개 초과: `--oneline` 요약과 `--stat`만으로 본문 작성
 
-커밋 메시지와 diff 통계를 분석하여 본문 작성.
-
-### dev 파이프라인 컨텍스트 연동
-
-PR 본문 생성 전에 현재 브랜치명에서 DEV_DIR을 계산하고 (`git branch --show-current` → `/`를 `-`로 치환 → `.dev/{branch-slug}/`), `${DEV_DIR}/pr-context.md` 파일 존재 여부를 확인한다:
-- **존재하면**: Read하여 내용을 PR 본문에 반영한다.
-  - `## Background` 항목이 있으면 PR 본문의 Background 섹션에 병합한다.
-  - `## Audit Summary` 항목이 있으면 PR 본문의 Checklist 앞에 해당 섹션을 삽입한다.
-- **존재하지 않으면**: 이 단계를 건너뛴다 (독립 호출 시 정상 동작).
+커밋 메시지와 diff 통계를 분석하여 본문 작성. `--background`가 지정된 경우 해당 파일을 Read하여 Background 섹션에 비즈니스 맥락(배경, 요구사항)을 병합한다.
 
 ```
 ## Background
 이 변경이 필요한 배경을 설명한다. 어떤 문제가 있었는지, 비즈니스 맥락은 무엇인지를
 리뷰어가 코드를 읽기 전에 이해할 수 있도록 자연스러운 문장으로 서술한다.
+(--background 파일이 있으면 해당 문서의 "배경"과 "요구사항"을 우선 반영하고, git log 정보로 보완한다)
 
 ## Summary
 이 PR에서 무엇을 했는지 요약한다. 핵심 접근 방식과 설계 판단을
@@ -116,6 +157,8 @@ PR 본문 생성 전에 현재 브랜치명에서 DEV_DIR을 계산하고 (`git 
 구체적으로 무엇이 바뀌었는지를 기능 단위로 설명한다. 파일 단위가 아니라
 "무엇을 왜 그렇게 바꿨는지"를 문장으로 풀어쓴다.
 
+(--extra-section 파일이 있으면 여기에 해당 파일을 Read하여 요약 섹션을 삽입한다. 예: Trust Ledger → ## Audit Summary. 단 ## Rulings·## Deferred 절은 요약 없이 항목 그대로)
+
 ## Checklist
 - [ ] 주요 기능이 로컬에서 정상 동작하는지 확인
 - [ ] 기존 테스트가 통과하는지 확인
@@ -124,7 +167,7 @@ PR 본문 생성 전에 현재 브랜치명에서 DEV_DIR을 계산하고 (`git 
 ```
 
 **작성 규칙**:
-1. **문장형 서술**: 모든 섹션은 `-` bullet이 아닌 자연스러운 한국어 문장으로 쓴다. 단, Checklist는 체크박스 형태.
+1. **문장형 서술**: 모든 섹션은 `-` bullet이 아닌 자연스러운 한국어 문장으로 쓴다. 단, Checklist는 체크박스 형태. `--extra-section` 파일의 `## Rulings`·`## Deferred`도 예외 — 항목 불릿을 그대로 옮긴다.
 2. **Background ≠ Summary**: Background는 "왜(문제/맥락)", Summary는 "무엇을(해결책)". 둘을 혼합하지 않는다.
 3. **Changes는 기능 단위**: 파일명 나열이 아니라 기능 관점에서 "무엇이 어떻게 바뀌었고, 왜 그 방식을 선택했는지".
 4. **Checklist는 동적 생성**: 변경 내용에 따라 항목을 조정한다. 테스트가 없는 변경이면 테스트 항목 생략. 마이그레이션이 없으면 마이그레이션 항목 생략.
@@ -135,7 +178,7 @@ PR 본문 생성 전에 현재 브랜치명에서 DEV_DIR을 계산하고 (`git 
    - "업데이트": push 후 기존 PR 본문을 `gh pr edit`으로 갱신
    - "신규 생성": push 후 `gh pr create` (기존 PR은 열린 상태로 유지됨을 안내)
    - "취소": 스킬 종료
-2. 브랜치 푸시: `git push -u origin <branch-name>` (`timeout: 120000`)
+2. 브랜치 푸시: `git push -u origin <branch-name>` (`timeout: 120000` — config.json `timeouts.network` 값)
    - push 실패 시: 에러 메시지를 표시하고 "PR 생성을 건너뜁니다." 출력 후 **즉시 종료**
 3. PR 생성 (HEREDOC으로 body 전달):
    ```bash
@@ -164,22 +207,30 @@ PR 본문 생성 전에 현재 브랜치명에서 DEV_DIR을 계산하고 (`git 
 
 PR이 성공적으로 생성되었으면:
 
-1. `.claude/config.json`의 `notifications.slack` 확인
-   - `enabled`가 `false`이거나 `webhookUrl`이 비어있으면:
-     "Slack 알림이 설정되어 있지 않습니다. `/ttutak:setup`을 실행하면 웹훅을 연동할 수 있습니다." 안내 후 건너뜀
+1. `.claude/config.json`의 `notifications.slack`과 선택적 `notifications.googleChat`을 확인한다. Slack이 기본 공급자이며 기존 설정을 유지한다.
+   - `enabled`가 `true`이고 `webhookUrl`이 비어있지 않은 공급자만 전송한다.
+   - 활성 공급자가 없으면 "알림이 설정되어 있지 않습니다. `/setup`으로 Slack 웹훅을 연동할 수 있습니다." 안내 후 건너뛴다.
+   - 웹훅 URL을 출력·커밋하지 않는다. 사용자가 연동한 공급자에만 알린다.
 
-2. 전송 (`timeout: 10000`):
+2. 각 활성 공급자에 전송 (`timeout: 10000`). 프로젝트명·PR URL은 JSON 인코더로 처리하고 응답 본문은 출력하지 않는다:
 
    ```bash
    PROJECT_NAME=$(basename "$(git rev-parse --show-toplevel)")
    TMPFILE=$(mktemp)
    trap 'rm -f "$TMPFILE"' EXIT
-   cat > "$TMPFILE" <<JSONEOF
-   {"text":"[$PROJECT_NAME] 새로운 PR을 확인해주세요: $PR_URL"}
-   JSONEOF
-   curl --max-time 10 -s -o /dev/null -X POST "$WEBHOOK_URL" \
-     -H "Content-Type: application/json; charset=utf-8" \
-     --data-binary "@$TMPFILE"
+   jq -n --arg text "[$PROJECT_NAME] 새로운 PR을 확인해주세요: $PR_URL" '{text: $text}' > "$TMPFILE"
+   for PROVIDER in slack googleChat; do
+     WEBHOOK_URL=$(jq -r --arg provider "$PROVIDER" '.notifications[$provider] | select(.enabled == true) | .webhookUrl // empty' .claude/config.json)
+     [ -n "$WEBHOOK_URL" ] || continue
+     case "$PROVIDER:$WEBHOOK_URL" in
+       slack:https://hooks.slack.com/services/*|googleChat:https://chat.googleapis.com/v1/spaces/*) ;;
+       *) echo "경고: $PROVIDER 웹훅 URL 형식이 올바르지 않아 건너뜁니다." >&2; continue ;;
+     esac
+     if ! curl --max-time 10 --fail --silent --output /dev/null -X POST "$WEBHOOK_URL" \
+       -H "Content-Type: application/json; charset=utf-8" --data-binary "@$TMPFILE"; then
+       echo "경고: $PROVIDER 알림 전송에 실패했습니다." >&2
+     fi
+   done
    ```
 
-3. 실패해도 작업 흐름을 중단하지 않음. 경고만 출력.
+3. 알림 실패는 PR 성공을 취소하거나 작업 흐름을 중단하지 않는다. 경고만 출력한다.

@@ -14,36 +14,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Extract version from plugin.json
+      - name: Verify manifest parity and changelog
         id: version
         run: |
-          VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Verify version parity
-        run: |
-          PN=$(jq -r '.name' .claude-plugin/plugin.json)
-          PV=$(jq -r '.version' .claude-plugin/plugin.json)
-          MV=$(jq -r --arg name "$PN" '.plugins[] | select(.name == $name) | .version' .claude-plugin/marketplace.json)
-          if [ -z "$MV" ] || [ "$MV" = "null" ]; then
-            echo "::error::marketplace.json missing plugin entry for name=$PN"
+          set -euo pipefail
+          PN=$(jq -er '.name | select(type == "string" and length > 0)' .claude-plugin/plugin.json)
+          PV=$(jq -er '.version' .claude-plugin/plugin.json)
+          if ! [[ "$PV" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '::error::invalid manifest SemVer'
             exit 1
           fi
-          if [ "$PV" != "$MV" ]; then
-            echo "::error::version mismatch for plugin $PN: plugin.json=$PV marketplace.json=$MV"
+          jq -e --arg name "$PN" --arg version "$PV" '[.plugins[]? | select(.name == $name)] | length == 1 and .[0].version == $version' .claude-plugin/marketplace.json >/dev/null
+          jq -e --arg name "$PN" --arg version "$PV" '.name == $name and .version == $version' .codex-plugin/plugin.json >/dev/null
+          VERSION_RE=${PV//./\\.}
+          if ! grep -Eq "^## v${VERSION_RE}([ (]|$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md missing exact version section"
             exit 1
           fi
-          if ! grep -q "^## v$PV" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md missing '## v$PV' section"
-            exit 1
-          fi
+          echo "version=$PV" >> "$GITHUB_OUTPUT"
+          echo "tag=v$PV" >> "$GITHUB_OUTPUT"
 
       - name: Check if tag already exists
         id: check_tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
-          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -52,26 +51,27 @@ jobs:
       - name: Extract changelog for this version
         if: steps.check_tag.outputs.exists == 'false'
         id: changelog
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          # Extract title description from header: "## v1.3.0 (date) — description"
-          HEADER=$(grep "^## v${VERSION}" CHANGELOG.md | head -1)
-          TITLE_DESC=$(echo "$HEADER" | sed -n 's/.*— \(.*\)/\1/p')
+          set -euo pipefail
+          VERSION_RE=${VERSION//./\\.}
+          HEADER=$(grep -E "^## v${VERSION_RE}([ (]|$)" CHANGELOG.md | head -1)
+          TITLE_DESC=$(printf '%s\n' "$HEADER" | sed -n 's/.*— \(.*\)/\1/p')
           if [ -n "$TITLE_DESC" ]; then
             echo "title=v${VERSION} — ${TITLE_DESC}" >> "$GITHUB_OUTPUT"
           else
             echo "title=v${VERSION}" >> "$GITHUB_OUTPUT"
           fi
-          # Extract section between current version header and next version header
-          BODY=$(awk "/^## v${VERSION}/,/^## v[0-9]/" CHANGELOG.md | head -n -1 | tail -n +2)
-          # Write to file to preserve newlines
-          echo "$BODY" > /tmp/release_body.md
+          awk -v pattern="^## v${VERSION_RE}([ (]|$)" '$0 ~ pattern {flag=1; next} /^## v[0-9]/{flag=0} flag' CHANGELOG.md > "$RUNNER_TEMP/release_body.md"
 
       - name: Create GitHub Release
         if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "${{ steps.changelog.outputs.title }}" \
-            --notes-file /tmp/release_body.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.changelog.outputs.title }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --target "$GITHUB_SHA" --title "$RELEASE_TITLE" \
+            --notes-file "$RUNNER_TEMP/release_body.md"

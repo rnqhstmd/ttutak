@@ -1,15 +1,45 @@
 # phase-complete: 완료
 
+> **CRITICAL: 기능 코드의 커밋/PR 직접 실행 절대 금지.**
+> `git commit`, `gh pr create` 등 VCS 명령어를 오케스트레이터가 직접 실행하지 않는다.
+> 반드시 `Skill(skill: "ttuk-ttak:commit")`, `Skill(skill: "ttuk-ttak:pull-request")`을 호출한다.
+> 스킬 호출이 실패하면 사용자에게 보고하고, 직접 명령어로 우회하지 않는다.
+> **유일한 예외**: 아래 "공통: context 변경사항 자동 커밋"(Step 3~4)의 context 동기화 커밋/push는 전용 메시지 형식(`docs: [context] …`)과 push 정책으로 직접 수행한다 — 기능 코드가 아닌 status.md 문서 동기화 전용이며, skill-routing.md에 예외로 명시돼 있다.
+
 각 단계가 실패하면 사용자에게 보고하고 진행 여부를 확인한다.
 
-## Step 0: 인수 검증 (ProductOwner)
-PRD가 없으면 이 단계를 건너뛴다.
+## Step 0-pre: diff 갱신
+phase-review 이후 coder 수정이 있었을 수 있으므로 diff를 갱신한다. 이 단계는 인수 검증 여부와 무관하게 항상 실행한다.
+- **git**: `git add -A`로 스테이징한 후 **Diff 수집 규칙**에 따라 diff를 `DIFF_FILE`에 리다이렉트.
+- **svn**: `svn diff > ${DIFF_FILE}`로 갱신.
+
+## Step 0: 인수 검증 (ProductOwner / 핵심 모드는 AC 자가 검증)
+
+**핵심 모드이면** product-owner를 디스패치하지 않고 오케스트레이터가 **AC 자가 검증**을 직접 수행한다:
+1. `${DEV_DIR}/ac.md`(레거시 재개로 ac.md가 없으면 prd.md)의 AC 목록과 구현 결과(summary.md, DIFF_FILE)·Gate 결과를 대조한다.
+2. AC별 충족 여부 체크리스트를 사용자에게 표시한다 (예: `AC-1 ✅ / AC-2 ⚠️ 부분 충족 — 사유`).
+3. 모두 충족 → 다음 단계 진행. 미충족이 있으면 AskUserQuestion으로 확인한다:
+   ```
+   AskUserQuestion(
+     questions: [{
+       header: "AC 자가 검증",
+       question: "AC 자가 검증에서 미충족 항목이 있습니다. 어떻게 진행할까요?",
+       multiSelect: false,
+       options: [
+         { label: "수정", description: "미충족 항목을 수정하고 Gate·자가 검증을 재실행합니다" },
+         { label: "진행", description: "미충족 항목을 명시한 채 다음 단계로 진행합니다 (status.md 갱신 제외)" }
+       ]
+     }]
+   )
+   ```
+   - "수정" → 미충족 항목을 수정(phase-core Step 1의 구현 주체와 동일)하고 Gate 재실행 후 자가 검증 1회 재실행.
+   - "진행" → 미충족 항목을 명시한 채 다음 단계 진행 (Step 3 status.md 갱신은 건너뛴다).
+
+**전체 모드**는 아래를 따른다. PRD가 없으면 이 단계를 건너뛴다.
 
 PRD가 있으면 (`${DEV_DIR}/prd.md`), product-owner에게 인수 검증을 요청한다.
 
-**diff 갱신**: phase-review 이후 coder 수정이 있었을 수 있으므로, `git add -A`로 스테이징한 후 **Diff 수집 규칙**에 따라 diff를 `DIFF_FILE`에 리다이렉트하여 갱신한다.
-
-`Task(subagent_type="product-owner")` — prompt에 다음을 포함:
+`Task(subagent_type="ttuk-ttak:product-owner")` — prompt에 다음을 포함:
 - PRD의 "요구사항" + "수용 기준" (Context Slicing 규칙 참조)
 - 변경사항 diff 파일 경로 (`DIFF_FILE`) + Read 지시
 - 코드 맵
@@ -17,76 +47,196 @@ PRD가 있으면 (`${DEV_DIR}/prd.md`), product-owner에게 인수 검증을 요
 
 **결과를 사용자에게 요약만 보고한다** (Agent 전문 출력 금지):
 - **ACCEPT**: "인수 검증 통과. 모든 [Must] 수용 기준 충족." 다음 단계 진행.
-- **REJECT**: "인수 검증 미통과. [Must] 미충족 N건:" + 미충족 항목 목록만 표시. 수정 여부를 확인한다.
+- **REJECT**: "인수 검증 미통과. [Must] 미충족 N건:" + 미충족 항목 목록만 표시. 수정 여부를 확인한다:
+  ```
+  AskUserQuestion(
+    questions: [{
+      header: "인수 검증",
+      question: "인수 검증에서 미충족 항목이 있습니다. 자동 수정할까요?",
+      multiSelect: false,
+      options: [
+        { label: "수정", description: "미충족 항목을 자동 수정합니다" },
+        { label: "건너뛰기", description: "현재 상태로 다음 단계로 진행합니다" }
+      ]
+    }]
+  )
+  ```
   - 수정 선택 → coder로 수정 후 인수 검증 1회 재실행.
   - 건너뛰기 선택 → 다음 단계 진행.
 
-위 Step 0 진입 조건에 의해 PRD 부재이면 이 단계 전체가 건너뛰어진다.
+> **참고**: 핵심 모드의 AC 자가 검증은 에이전트 디스패치 없이 수행된다. status.md를 갱신하는 경우 핵심 모드는 항상 **경로 B (커밋 기반)**를 사용한다 (core AC는 경량이므로 커밋 단위 추적이 적합). 단 **갱신 여부**는 아래 Step 3 분기 규칙을 따른다 — AC 자가 검증에 미충족이 남았으면 갱신 자체를 건너뛴다("무관하게"는 경로 선택에만 적용, 갱신 실행에는 적용하지 않는다).
 
 ## Step 1: Commit
 
-`Skill("ttutak:commit")`을 호출하여 커밋한다 (build 실행 → commit 일괄).
+**svn인 경우** → 건너뛴다. "SVN 프로젝트입니다. 리뷰 완료를 확인하고, `svn add --force .`로 신규 파일(.dev 산출물 포함)이 등록되었는지 확인한 뒤 `svn commit`을 직접 실행해주세요." 출력 후 Step 3으로 진행.
 
-**build 실패 시 자동 수정 (1회):**
-1. commit 스킬이 build 실패로 중단하면, 실패 로그와 코드 맵, PROJECT_ROOT를 `Task(subagent_type="coder")`에 전달하여 수정 요청.
-2. 수정 완료 후 `Skill("ttutak:commit")`을 다시 호출한다.
+**git인 경우:**
+
+`Skill(skill: "ttuk-ttak:commit")`을 호출하여 커밋을 실행한다.
+
+**test 실패 시 자동 수정 (1회):**
+1. commit 스킬이 test 실패로 중단하면, 실패 로그와 코드 맵, PROJECT_ROOT를 `Task(subagent_type="ttuk-ttak:coder")`에 전달하여 수정 요청.
+2. 수정 완료 후 `Skill(skill: "ttuk-ttak:commit")`을 재호출한다.
 3. 재호출도 실패하면 사용자에게 실패 목록을 보고하고 진행 여부를 확인한다.
 
 ## Step 2: PR 생성
-`Skill("ttutak:pull-request")`를 호출하여 PR을 생성한다. pull-request은 독립 스킬이므로 dev 컨텍스트를 알지 못한다. 오케스트레이터가 **스킬 호출 전에** `${DEV_DIR}/pr-context.md`를 조립하여 비즈니스 맥락을 전달한다.
 
-### Step 2-1: `${DEV_DIR}/pr-context.md` 조립 (Skill 호출 전)
+**svn인 경우** → 건너뛴다 (Step 1에서 이미 건너뜀).
 
-오케스트레이터가 아래 내용을 `${DEV_DIR}/pr-context.md`에 Write한다:
+**git인 경우:**
 
-1. **비즈니스 맥락**: PRD의 "배경"과 "요구사항", 설계서의 "배경 및 목적". `--hotfix`이면 ARGS[0]을 사용.
-2. **Trust Ledger 요약**: `${DEV_DIR}/trust-ledger.md`가 존재하면 Read하여 아래 형식으로 포함한다:
-   ```
-   ## Audit Summary
-   - 총 N건 (CRITICAL: n, HIGH: n, MEDIUM: n)
-   - [주요 발견 항목 1줄 요약] (최대 5건)
-   ```
-   Trust Ledger가 없으면 이 섹션을 생략한다.
+`Skill(skill: "ttuk-ttak:pull-request")`을 호출하여 PR을 생성한다. args를 통해 dev 컨텍스트를 전달한다:
 
-   **Hotfix 감사 병기**: Trust Ledger에 `### Hotfix 긴급 감사` 섹션이 포함되어 있으면, `## Audit Summary` 블록 끝에 `- hotfix 감사: CRITICAL n건, HIGH n건 (자세한 내용은 Trust Ledger 참조)` 한 줄을 추가한다. 정상 플로우와 hotfix 모두 동일한 Audit Summary 포맷을 사용하여 PR 본문의 일관성을 유지한다.
-
-### Step 2-2: `Skill("ttutak:pull-request")` 호출
-
-`${DEV_DIR}/pr-context.md` 조립이 완료된 후 `Skill("ttutak:pull-request")`를 호출한다.
-pull-request 스킬이 `${DEV_DIR}/pr-context.md`를 자동 감지하여 PR 본문에 반영한다.
-
-### Step 2-3: 후속 처리
-
-- pull-request 스킬이 전제조건 미충족(gh 미설치, remote 미설정 등)으로 종료하면, 오케스트레이터는 후속 안내를 추가한다: "나중에 `/ttutak:pull-request`로 PR을 생성할 수 있습니다."
-- **PR 생성 후 알림**: pull-request 스킬이 알림까지 처리한다. 스킬 종료 후 알림이 누락된 정황이 있으면 (PR URL은 있으나 알림 미전송) 오케스트레이터가 알림 전송을 직접 수행한다.
+1. **args 구성**:
+   - `--background ${DEV_DIR}/prd.md`: PRD의 "배경"과 "요구사항"을 Background 섹션에 반영. **핵심 모드이면 `--background ${DEV_DIR}/ac.md`** (ac.md도 "배경"+"요구사항" 섹션 구조라 동일하게 파싱된다. 레거시 재개로 ac.md가 없고 prd.md만 있으면 prd.md를 사용한다).
+   - `--extra-section ${DEV_DIR}/trust-ledger.md`: Trust Ledger가 존재하면 Audit Summary 섹션을 Checklist 앞에 삽입. **핵심 모드이면 `--extra-section ${DEV_DIR}/summary.md`** (변경 요약 + Gate 증거). 해당 파일이 없으면 `--extra-section`을 생략한다.
+   - 예: `Skill(skill: "ttuk-ttak:pull-request", args: "--background ${DEV_DIR}/prd.md --extra-section ${DEV_DIR}/trust-ledger.md")`
+2. pull-request 스킬이 전제조건 미충족(gh 미설치, remote 미설정 등)으로 종료하면, 오케스트레이터는 후속 안내를 추가한다: "나중에 `/pull-request`로 PR을 생성할 수 있습니다."
+3. **PR 생성 후 알림**: `pull-request` 스킬이 PR 생성 후 내부적으로 알림 절차를 수행한다. 오케스트레이터가 별도로 알림을 처리할 필요 없다.
 
 ## Step 3: 도메인 status.md 갱신
 
-`DOMAIN_CONTEXT`가 있고 (phase-setup에서 도메인 매칭 성공), Step 0 인수 검증이 ACCEPT이면 실행한다. 그 외에는 건너뛴다.
+**git인 경우에만 실행한다.** svn인 경우 건너뛴다 (SVN은 브랜치 기반 커밋 로그 비교가 불가하며, Step 1에서 커밋도 건너뛰므로 동기화 대상이 없다).
+
+`DOMAIN_CONTEXT`가 없으면 (phase-setup에서 도메인 매칭 실패) 건너뛴다.
+
+`DOMAIN_CONTEXT`가 있으면, 모드에 따라 **경로 A** 또는 **경로 B**로 분기한다.
+
+### 분기 규칙
+
+```
+if 핵심 모드이고 Step 0 AC 자가 검증에 미충족이 있음 → 건너뛴다 (미충족 상태에서 갱신하면 안 됨)
+elif 핵심 모드 → 경로 B (커밋 기반 — core AC는 경량이므로 커밋 단위 추적이 적합)
+elif 전체 모드이고 Step 0 인수 검증이 ACCEPT → 경로 A
+elif 전체 모드이고 Step 0 인수 검증이 REJECT → 건너뛴다 (미충족 상태에서 status.md를 ✅로 바꾸면 안 됨)
+elif 인수 검증이 실행되지 않음 (PRD 부재 등) → 경로 B (커밋 기반 — 사용자 확인 후에만 갱신하므로 안전)
+else → 건너뛴다
+```
+
+### 경로 A: 인수 검증 기반 (전체 모드)
+
+전체 모드이고 Step 0 인수 검증이 ACCEPT이면 이 경로를 사용한다.
 
 1. Step 0 인수 검증 결과에서 **통과한 AC 목록**을 추출한다 (예: AC-1, AC-4, AC-7).
 2. 매칭된 도메인의 `context/{domain}/status.md`를 Read한다.
-3. 통과한 AC와 일치하는 행의 상태를 `⬜`→`✅`로, PR 열에 생성된 PR 링크를 기입한다.
-4. AC가 `-`인 행은 변경하지 않는다 (PR 머지 시 수동 판정).
+3. 통과한 AC와 일치하는 행의 상태를 `⬜`→`✅`로, PR 열에 생성된 PR 링크를 기입한다. PRD가 `FR-N (status.md 미반영)` 형식으로 FR ID를 인용한 AC는 그 FR 행을 대상으로 한다 (행의 AC 열이 비어 있거나 `-`여도 매칭되며, AC 열에 이번 AC ID를 기입한다).
+4. AC가 `-`인 행은 변경하지 않는다 (PR 머지 시 수동 판정). 단, 항목 3의 `FR-N (status.md 미반영)` 인용으로 매칭된 행은 예외다.
 5. Edit으로 status.md를 갱신한다.
 6. 갱신 결과를 사용자에게 보고한다:
    ```
    status.md 갱신: ✅ AC-1, AC-4, AC-7 (FR-1, FR-16, FR-19)
    ```
 
+### 경로 B: 커밋 기반 (핵심 모드 / 인수 검증 미실행)
+
+핵심 모드이거나, 인수 검증이 실행되지 않은 경우(PRD 부재 등 — 모드 무관)에 이 경로를 사용한다.
+
+1. `${GIT_PREFIX} log ${BASE_BRANCH}..HEAD --oneline`로 현재 브랜치의 커밋 목록을 수집한다.
+2. 매칭된 도메인의 `context/{domain}/status.md`를 Read한다.
+3. status.md에서 `⬜` 상태인 항목을 파싱한다.
+4. 커밋 메시지와 `⬜` 항목을 대조하여 매칭 후보를 구성한다:
+   - **ID 직접 매칭** (우선): 커밋 메시지에 FR/BR ID(예: `FR-2`, `BR-5`)가 직접 언급된 경우 확정 매칭.
+   - **키워드 매칭** (보조): ID가 없으면 커밋 메시지의 핵심 명사와 항목 설명의 명사를 대조하여, 2개 이상 일치 시 후보로 제시.
+5. **매칭 후보가 없으면** → 건너뛴다.
+6. **매칭 후보가 있으면** → AskUserQuestion으로 사용자에게 확인한다:
+   ```
+   AskUserQuestion(
+     questions: [{
+       header: "status.md 갱신",
+       question: "커밋 기반으로 다음 항목의 상태를 갱신할까요?\n\n매칭된 항목:\n- FR-2: 결제 한도 변경 (⬜ → ✅)\n  근거: feat: 결제 한도 검증 로직 추가 (abc1234)",
+       multiSelect: false,
+       options: [
+         { label: "갱신", description: "아래 항목을 ✅로 변경합니다" },
+         { label: "건너뛰기", description: "갱신하지 않고 진행합니다" }
+       ]
+     }]
+   )
+   ```
+7. 승인 시 `⬜`→`✅` 갱신 + PR 열에 생성된 PR 링크 (있으면) 또는 커밋 해시를 기입한다.
+
+## Step 3.5: 작업 계획(plan.md) 갱신
+
+**Step 3과 독립적으로 판정한다.** Step 3은 `DOMAIN_CONTEXT` 존재와 인수 검증 결과를 조건으로 하지만, 이 단계는 그와 무관하게 아래만 확인한다. `--phase complete` 경로는 phase-setup을 거치지 않아 `DOMAIN_CONTEXT`가 비어 있으므로, Step 3에 종속시키면 갱신이 영영 일어나지 않는다. 핵심 모드에서 Step 3이 건너뛰어지는 경우에도 이 단계는 실행된다.
+
+**진입 조건**: `.dev/plan.md`가 존재한다.
+
+1. 행을 찾는다. state.md에 `work-id`가 있으면 그 ID의 행을, 없으면 `작업 위치` 열이 현재 브랜치(svn은 `.dev/.active`의 slug)와 일치하는 행을 쓴다.
+2. **행이 없으면 아무것도 하지 않고 다음 Step으로 넘어간다.** `--work` 없이 시작한 작업은 계획에 없는 것이 정상이며, 이 시점은 커밋·PR이 이미 끝난 뒤라 중단할 수 없다.
+3. `상태` 열을 `완료`로 바꾼다. 단, 현재 값이 `폐기`면 **바꾸지 않고** "폐기된 작업이 완료 처리 대상입니다 — 계획을 확인하세요"를 경고한다. 폐기는 요구사항이 사라졌다는 뜻이므로, 완료로 덮으면 왜 사라졌는지가 지워진다.
+4. **전용 커밋**: `.dev/plan.md`만 스테이징하여 `docs: [plan] {ID} 완료` 메시지로 커밋하고 **현재 작업 브랜치로** push한다. 착수 기록(phase-setup Step 5.5)과 같은 층위이며, 둘 다 PR과 함께 베이스 브랜치로 머지된다 — 한쪽만 베이스로 직접 보내면 보호 브랜치에서 거부되고 착수·완료의 가시성이 어긋난다. 기능 코드가 아닌 계획 문서 동기화 전용이며, dev의 `docs: [context] …` 커밋과 같은 층위의 예외다 (skill-routing.md에 명시). svn이면 커밋하지 않고 사용자에게 터미널에서 직접 반영하도록 안내한다.
+
+**status.md는 건드리지 않는다.** status.md 갱신은 Step 3이 AC 축으로 수행한다. plan.md의 `요구사항` 열은 참조 표기일 뿐이며, 여기서 전파하면 부분 통과한 AC까지 완료로 뒤집힌다.
+
+**되돌림은 여기서 하지 않는다.** 완료한 작업에 다시 들어갈 때의 `완료 → 진행` 복원은 phase-setup Step 7(진행 상태 초기화)이 담당한다 — 이 단계는 완료를 기록할 뿐 재진입 시점을 알지 못하므로, 여기에 규칙을 두면 실행되지 않는다.
+
+### 공통: context 변경사항 자동 커밋
+
+경로 A 또는 경로 B에서 status.md가 갱신되었으면, context 변경을 별도 커밋으로 기록한다:
+
+1. `${GIT_PREFIX} add context/`로 context 변경사항을 스테이징한다.
+2. `${GIT_PREFIX} diff --cached --quiet -- context/`로 실제 변경이 있는지 확인한다.
+3. 변경이 있으면 커밋한다:
+   ```
+   ${GIT_PREFIX} commit -m "docs: [context] {domain} status.md 동기화 — {갱신된 AC 목록}"
+   ```
+4. 변경이 없으면 (이미 최신이면) 건너뛴다.
+
+> **push 정책**: context 자동 커밋은 로컬에만 생성된다. Step 2(PR 생성)에서 `pull-request` 스킬이 이미 `git push`를 실행했으므로, Step 3~4에서 추가된 context 커밋은 별도 push가 필요하다. GitHub/GitLab에서는 PR이 브랜치를 추적하므로, 추가 push된 커밋은 자동으로 PR diff에 반영된다.
+>
+> Step 3 또는 Step 4에서 context 커밋이 **1건 이상** 생긴 경우에만 `${GIT_PREFIX} push`를 Step 4 완료 후 1회 실행한다. context 커밋이 0건이면 push를 실행하지 않는다. Step 2가 건너뛰어진 경우(gh 미설치 등)에도 push를 시도하며, 실패 시 동일한 안내를 출력한다.
+> - push 성공: "context 변경이 PR에 반영되었습니다."
+> - push 실패: "context 커밋이 로컬에 남아있습니다. 수동으로 `git push`를 실행해주세요. PR 머지 전에 push하지 않으면 context 변경이 유실됩니다."
+
+> **svn인 경우**: 자동 커밋하지 않는다. "status.md가 갱신되었습니다. `svn commit`으로 반영해주세요." 안내만 출력한다.
+
 ## Step 4: context 환류 제안
 
-`DOMAIN_CONTEXT`가 있으면 실행한다. 없으면 건너뛴다.
+`DOMAIN_CONTEXT`가 없으면 건너뛴다.
 
-PRD와 설계서에서 context 갱신 후보를 추출하여 사용자에게 제안한다:
+`DOMAIN_CONTEXT`가 있으면, 모드에 따라 입력 소스를 결정한다:
 
+| 모드 | 입력 소스 | 추출 가능 후보 |
+|------|----------|---------------|
+| 전체 | PRD + 설계서 | glossary, 주제 문서, architecture |
+| 핵심 | diff + ac.md | glossary, architecture |
+
+### 후보 추출
+
+**전체 모드** (PRD + 설계서):
 1. **glossary 후보**: PRD/설계서에 등장하는 도메인 용어 중, 현재 `glossary.md`에 없는 것을 추출한다.
 2. **주제 문서 후보**: PRD 제목과 배경을 기반으로, 주제 문서 생성을 제안한다.
 3. **architecture.md 갱신 후보**: 설계서에 새로운 구조적 결정(레이어, 의존관계 등)이 있으면 인덱스 갱신을 제안한다.
 
-사용자에게 AskUserQuestion으로 제안:
-- "context 문서에 반영할까요?" + 후보 목록 표시
-- 반영 선택 → 해당 파일 Edit/Write. 주제 문서 생성 시 architecture.md 인덱스에 링크 추가.
+**핵심 모드** (ac.md + diff):
+1. `${GIT_PREFIX} diff ${BASE_BRANCH}..HEAD`에서 변경 내용을 수집한다.
+2. **glossary 후보**: ac.md와 diff에서 도메인 용어(새 클래스명·패키지명·상수명 포함)를 추출하고, 현재 `glossary.md`에 없는 것을 필터링한다.
+3. **architecture.md 갱신 후보**: diff에서 새 모듈, 새 레이어, 새 외부 연동이 발견되면 갱신을 제안한다.
+
+### 후보가 없으면 건너뛴다.
+
+### 후보가 있으면
+
+후보 목록을 표시한 후:
+```
+AskUserQuestion(
+  questions: [{
+    header: "context 환류",
+    question: "위 항목을 context 문서에 반영할까요?",
+    multiSelect: false,
+    options: [
+      { label: "반영", description: "context 문서를 갱신합니다" },
+      { label: "건너뛰기", description: "다음 단계로 진행합니다" }
+    ]
+  }]
+)
+```
+- 반영 선택 → 해당 파일 Edit/Write. 주제 문서 생성 시 architecture.md 인덱스에 링크 추가. 반영된 context 변경을 커밋한다:
+  - **git인 경우**:
+    1. `${GIT_PREFIX} add context/`로 context 변경사항을 스테이징한다.
+    2. `${GIT_PREFIX} diff --cached --quiet -- context/`로 실제 변경이 있는지 확인한다.
+    3. 변경이 있으면 커밋: `${GIT_PREFIX} commit -m "docs: [context] {domain} 환류 반영 — {갱신된 항목 목록}"`
+    4. 변경이 없으면 건너뛴다.
+  - **svn인 경우**: 자동 커밋하지 않는다. "context 문서가 갱신되었습니다. `svn commit`으로 반영해주세요." 안내만 출력한다.
 - 건너뛰기 선택 → 다음 단계 진행.
 
 **임의 반영 금지**: 사용자 승인 없이 context 문서를 수정하지 않는다.
