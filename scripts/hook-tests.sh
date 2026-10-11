@@ -99,6 +99,30 @@ assert_repo() { local got; got=$(run_in_repo "$2"); [ -z "$got" ] && got="PASS"
 
 printf 'pipeline: tdd\nstatus: in_progress\nverify-status: pending\n' > "$SB/.dev/feat-x/state.md"
 assert_repo "verify 미통과 커밋" commit1 ask
+payload msgpath "git commit -m 'fix -C /tmp/nonexistent-parity-dir'"
+assert_repo "메시지 -C로 verify 우회 불가" msgpath ask
+payload msgattached "git commit -m 'fix -C/tmp/nonexistent-parity-dir'"
+assert_repo "메시지 붙은 -C로 verify 우회 불가" msgattached ask
+payload configpath "git -c alias.note='-C /tmp/nonexistent-parity-dir' commit -m wip"
+assert_repo "전역 -c 값의 -C는 경로 아님" configpath ask
+payload quotedseparator "git commit -m 'fix; -C /tmp/nonexistent-parity-dir'"
+assert_repo "따옴표 메시지 구분자는 명령 분리 아님" quotedseparator ask
+payload stats "git commitstats"
+assert_repo "commitstats 오탐 없음" stats PASS
+(cd "$SB" && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m fixture && git checkout -q -b main)
+assert_repo "메시지 -C로 main 보호 우회 불가" msgpath deny
+assert_repo "메시지 붙은 -C로 main 보호 우회 불가" msgattached deny
+assert_repo "전역 -c 값으로 main 보호 우회 불가" configpath deny
+payload wrapper 'bash -c \"git commit -m fix\"'
+assert_repo "bash -c 래핑 main 보호 유지" wrapper deny
+payload wrappedchain "bash -c 'git status && git commit -m fix'"
+assert_repo "bash -c 복합 명령 main 보호 유지" wrappedchain deny
+(cd "$SB" && git checkout -q feat/x)
+SPACE_REPO="$TMP/repo with spaces"; mkdir -p "$SPACE_REPO"
+(cd "$SPACE_REPO" && git init -q && git checkout -q -b main)
+# Single-quoted shell paths do not require JSON escaping.
+payload quotedpath "git -C '$SPACE_REPO' commit -m 'fix -C /tmp/nonexistent-parity-dir'"
+check "따옴표 공백 경로의 보호 브랜치 유지" quotedpath deny
 # The legacy -C parser must carry the correct repository into the latest verify gate.
 payload crossrepo "git -C $SB --no-pager commit -m wip"
 check "다른 저장소 -C verify 미통과 확인" crossrepo ask

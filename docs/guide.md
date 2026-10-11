@@ -11,7 +11,7 @@
 ### 스킬 전체 맵
 
 ```
-/ttuk-ttak:setup ─────── 초기 설정 (gh, JDK, 인증, Chat 알림)
+/ttuk-ttak:setup ─────── 초기 설정 (gh, JDK, 인증, Slack 알림)
                      │
 /ttuk-ttak:context ──────── 도메인 지식 등록/갱신
      │                     ↑ (context 동기화 제안)
@@ -69,7 +69,7 @@
 | 1 | 필수 도구 (gh CLI, JDK) | `gh : 완료 ✅` |
 | 2 | GitHub 인증 | `GH 인증 : 완료 ✅` |
 | 3 | context/ 안내 | 도메인 지식 등록 안내 |
-| 4 | Google Chat 연동 (선택) | 웹훅 URL 입력 |
+| 4 | Slack 연동 (선택) | 웹훅 URL 입력; 기존 Google Chat 보존, URL 출력·커밋 금지 |
 
 설정 완료 후 퀵스타트가 표시됩니다:
 
@@ -92,7 +92,8 @@
 | `conventions.prTitleMapping` | feat→FEATURE 등 | PR 제목 타입 매핑 |
 | `projectTypes` | java-spring, node | 프로젝트 감지 및 빌드 명령 |
 | `sensitiveFilePatterns` | `.env*`, `*.key` 등 | 커밋 시 경고할 파일 패턴 |
-| `notifications.googleChat` | 비활성 | PR 생성 시 Chat 알림 |
+| `notifications.slack` | 비활성 | 기본 공급자, PR 생성 시 Slack 알림 |
+| `notifications.googleChat` | 비활성 | 기존 Chat 설정과의 호환 유지 |
 
 ---
 
@@ -774,15 +775,15 @@ python은 별도 빌드가 없어 `build` 필드를 생략한다. 값 제안은 
 
 한쪽 레이어에 테스트 러너가 없으면 `/ttuk-ttak:tdd`는 구현 진입 전에 멈추고 선택지를 제시한다 (하네스 구축 / 해당 AC 제외 후 진행 / 중단). 러너 없이는 실패 테스트를 쓸 수 없어 tdd로 하네스를 만들 수는 없으므로, 구축 자체는 `/ttuk-ttak:dev`로 별도 수행한다 — 절차는 `docs/test-harness-guide.md`의 JS/TS 절에 있다.
 
-### Google Chat 알림 연동
+### Slack 알림 연동
 
-`/ttuk-ttak:setup`에서 설정하거나, config.json을 직접 수정:
+`/ttuk-ttak:setup`에서 Slack을 설정합니다. 기존 Google Chat 설정은 보존하며 Chat만 연동된 프로젝트에는 Slack을 추가로 묻지 않습니다. 웹훅 URL은 출력·커밋하지 않습니다. 개인 로컬 설정 예시:
 
 ```json
 "notifications": {
-  "googleChat": {
+  "slack": {
     "enabled": true,
-    "webhookUrl": "https://chat.googleapis.com/v1/spaces/..."
+    "webhookUrl": "https://hooks.slack.com/services/..."
   }
 }
 ```

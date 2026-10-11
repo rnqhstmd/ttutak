@@ -15,6 +15,31 @@ hook = load("gx_codex_hook", ".claude/hooks/codex_hook.py")
 
 
 class GuardTests(unittest.TestCase):
+    def test_real_guard_does_not_read_repository_from_commit_message(self):
+        """Message/config -C text must not bypass protected or pending gates."""
+        with tempfile.TemporaryDirectory() as cwd:
+            subprocess.run(["git", "init", "-q", cwd], check=True)
+            subprocess.run(["git", "-C", cwd, "checkout", "-q", "-b", "main"], check=True)
+            commands = [
+                "git commit -m 'fix -C /tmp/nonexistent-parity-dir'",
+                "git commit -m 'fix -C/tmp/nonexistent-parity-dir'",
+                "git -c alias.note='-C /tmp/nonexistent-parity-dir' commit -m wip",
+                "git commit -m 'fix; -C /tmp/nonexistent-parity-dir'",
+                'bash -c "git commit -m fix"',
+                "bash -c 'git status && git commit -m fix'",
+                f'git -C "{cwd}" commit -m "fix -C /tmp/nonexistent-parity-dir"',
+            ]
+            for branch in ("main", "feat/parity"):
+                if branch != "main":
+                    subprocess.run(["git", "-C", cwd, "checkout", "-q", "-b", branch], check=True)
+                    state = Path(cwd) / ".dev/feat-parity/state.md"
+                    state.parent.mkdir(parents=True)
+                    state.write_text("pipeline: tdd\nstatus: in_progress\nverify-status: pending\n", encoding="utf-8")
+                for command in commands:
+                    with self.subTest(branch=branch, command=command):
+                        out = hook.run_guard({"cwd": cwd, "tool_input": {"command": command}})
+                        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
+
     def test_ask_becomes_deny(self):
         """Changing the Codex ask conversion to pass-through must fail here."""
         answer = {

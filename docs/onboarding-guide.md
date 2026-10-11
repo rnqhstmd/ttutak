@@ -10,7 +10,7 @@
 
 > 이 문서는 "설치하고 쓰기 시작하는 것"이 목적입니다. 내부 동작 원리(에이전트 디스패치 방식, Phase 실행 루프, 상태 계약)는 `docs/guide.md`를, 상황별 프롬프트 모음은 `docs/prompt-examples.md`를 참고하세요.
 
-> **Codex 사용자 안내 (2026-09-14):** 아래 본문의 설치 명령과 요금제 예시는 Claude Code 기준입니다. Codex 설치·프로젝트 준비·스킬 호출·업데이트는 [Codex 사용 가이드](codex-guide.md)를 따르세요. upstream의 Windows 실측은 [보관 자료](upstream-history.md)이며 현재 이식 검증은 [이식 보고서](migration-2.0.0.md)를 참고합니다.
+> **Codex 사용자 안내 (2026-10-11):** 아래 본문의 설치 명령과 요금제 예시는 Claude Code 기준입니다. Codex 설치·프로젝트 준비·스킬 호출·업데이트는 [Codex 사용 가이드](codex-guide.md)를 따르세요. upstream의 Windows 실측은 [보관 자료](upstream-history.md)이며 현재 이식 검증은 [이식 보고서](migration-2.0.0.md)를 참고합니다.
 
 ---
 
@@ -77,7 +77,7 @@
 | JDK 또는 Node.js | 프로젝트 스택에 따라 | `java -version` / `node -v` | 빌드·테스트 게이트 실행에 필요 |
 | Claude 요금제 | 필수 | — | Max는 표준 프로파일, Pro는 에코 프로파일 권장 (6장) |
 
-지원 환경: Windows / macOS / Linux, Git / SVN, Java(Spring Boot·Gradle) / Node.js.
+지원 환경: Windows / macOS / Linux, Git / SVN. dev·tdd는 언어 중립이며 프로젝트의 빌드·테스트 명령을 사용합니다. 기본 감지 템플릿은 Java(Spring Boot·Gradle) / Node.js이고 다른 스택은 `projectTypes`에 등록합니다. 기존 `/ttuk-ttak:test`만 Spring 전용입니다.
 
 ### 3.2 설치
 
@@ -106,7 +106,7 @@
 | 1 | 필수 도구 확인 | gh CLI, JDK 확인. 미설치 시 OS별 설치 명령 안내(winget·brew·choco·scoop) |
 | 2 | 인증 | GitHub 인증 상태 확인 |
 | 3 | context/ 안내 | 도메인 지식 등록 경로 안내 |
-| 4 | Google Chat 알림 (선택) | 웹훅 URL 등록 — 한 명이 설정해 커밋하면 팀 전체가 PR 알림 수신 |
+| 4 | Slack 알림 (선택) | 웹훅 등록; 기존 Google Chat 설정 보존. 웹훅 URL은 출력·커밋하지 않음 |
 | 5 | 모델 프로파일 (선택) | 표준 / 에코 기본값 지정 |
 
 완료 후 퀵스타트가 표시됩니다.
@@ -264,7 +264,7 @@ PRD의 수용 기준(AC)을 원장으로 변환하고, 외부 러너가 AC를 1�
 
 - **발화**: "랄프", "루프 돌려"(직접 호출) / `/ttuk-ttak:dev --ralph …`·`/ttuk-ttak:tdd --ralph …` 또는 "랄프로 …"(파이프라인에서 전환 — 기본 경로는 묻지 않음)
 - **전제**: git 프로젝트, 작업 브랜치, **PRD 확정 필수**, `projectTypes`에 테스트 명령 등록
-- **실행**: 준비 후 터미널에서 `bash scripts/gx-ralph.sh` (기본 최대 10회 반복)
+- **실행**: 준비 후 `/ttuk-ttak:ralph`가 안내하는 설치 플러그인의 `scripts/gx-ralph.sh` 절대경로 명령을 터미널에서 실행합니다 (기본 최대 10회 반복). Codex에서는 `GX_RALPH_HARNESS=codex`와 설치된 `ralph-iterate/SKILL.md` 절대경로인 `GX_RALPH_ITERATE_SKILL`도 지정합니다
 - **상태 확인**: `/ttuk-ttak:ralph --status`, `.dev/{브랜치명}/progress.txt`
 - **복귀**: 루프 종료 후 `--phase review` → `--phase complete`로 리뷰·인수·PR을 대화형으로 마무리
 - **제약**: SVN 미지원, 모델 프로파일(eco) 미적용 — 반복 세션 오케스트레이터 모델만 `GX_RALPH_MODEL` 환경변수로 바꿀 수 있음
@@ -331,8 +331,8 @@ PRD의 수용 기준(AC)을 원장으로 변환하고, 외부 러너가 AC를 1�
 
 - **발화**: "교차 리뷰", "교차 검증", "크로스 리뷰"
 - **사용 시점**: 파이프라인 **완료 후 PR 생성 직전에 단발로**. 파이프라인 도중에 부르면 자기점검·리뷰 단계와 중복됩니다.
-- **인자**: `--advisor codex|claude`, `--dev-dir <경로>`, `--base <브랜치>`, `--scope diff|stat`
-- **advisor 선택**: `codex`는 다른 모델 관점까지 확보되지만 codex CLI 설치·인증이 필요합니다(`npm install -g @openai/codex` 후 `codex login`). `claude`는 추가 설치 없이 동작합니다.
+- **인자**: `--advisor codex|claude|native`, `--dev-dir <경로>`, `--base <브랜치>`, `--scope diff|stat`
+- **advisor 선택**: `codex`는 다른 모델 관점까지 확보되지만 codex CLI 설치·인증이 필요합니다(`npm install -g @openai/codex` 후 `codex login`). `native`는 현재 하네스의 내부 역할로 리뷰합니다. `claude`는 Claude Code에서 내부 리뷰로 동작하며 Codex 호스트에서는 미지원 안내 후 중단합니다.
 - **검증 범위**: 일반 코드 품질이 아니라 AC 충족·설계 범위 이탈·신규 위험에 한정합니다.
 
 #### `/ttuk-ttak:humanizer` — AI 글쓰기 흔적 교정

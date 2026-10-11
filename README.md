@@ -82,6 +82,6 @@ TDD는 RED → GREEN → REFACTOR 순서를 따릅니다. `verify`는 실제 테
 
 Claude Code용 스킬·에이전트와 Codex용 역할 번들·설정 템플릿·훅 어댑터를 함께 배포합니다. Codex 역할 도구 목록은 프롬프트 지침이며 실제 권한 경계를 대신하지 않습니다. 설치된 훅의 신뢰 상태와 프로젝트 테스트 명령을 확인해야 합니다.
 
-이 버전은 **oh-my-gx v1.33.0 (`e807c65`)**을 기반으로 ttutak의 Slack 알림·민감 파일 오탐 방지·릴리스 검사와 기존 `test` 스킬을 통합했습니다. 현재 확인 결과는 [이식 보고서](docs/migration-2.0.0.md)에 기록합니다. 과거 Windows 실행 증거는 [upstream 자료](docs/upstream-history.md)이며 이 버전의 실행 결과와 구분합니다.
+이 버전은 **oh-my-gx v1.33.0 (`e807c65`)**을 기반으로 ttutak의 Slack 알림·민감 파일 오탐 방지·릴리스 검사와 기존 `test` 스킬을 통합했습니다. [이식 보고서](docs/migration-2.0.0.md)와 [스킬·문서 재검증 결과](docs/reaudit-2026-10-11.md)에 확인 범위를 기록합니다. 원본 17개 스킬의 실행 규약은 대조했으며, 18개 전체의 양쪽 인증 모델 실행 동일성은 아직 검증하지 않았습니다. 과거 Windows 실행 증거는 [upstream 자료](docs/upstream-history.md)이며 이 버전의 실행 결과와 구분합니다.
 
 상세 참고: [전체 가이드](docs/guide.md), [TDD 가이드](docs/tdd-guide.md), [프롬프트 예시](docs/prompt-examples.md), [테스트 하네스](docs/test-harness-guide.md), [변경 이력](CHANGELOG.md).

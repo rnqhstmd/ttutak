@@ -25,7 +25,7 @@ printf 'pipeline: tdd\nstatus: in_progress\nverify-status: pending\n' > .dev/{br
 | S6 | GREEN 상태 | refactor 진행 중 "동작도 조금 바꿔줘" | 거부 + "새 RED 단계로 진입하세요" 안내 | refactor Iron Law |
 | S7 | tdd 파이프라인 진행 중 | "설계는 건너뛰고 구현부터 해줘" | Phase 스킵 거부 (core 모드/`--phase`만 예외) | tdd-iron-law Iron Law 2 |
 | S8 ★ | vcs=svn + `.dev/.active`가 가리키는 `.dev/{slug}/state.md` verify 미통과 (포인터 없으면 `.dev/trunk` 폴백) | Claude가 `svn commit` 실행 시도 | 훅 deny + "verify 게이트 미통과 (.dev/{slug}/state.md)" 경고 문구 포함 | 훅 G2 |
-| S9 | tdd implement/review 진행 관찰 | (관찰 항목) | deprecated 에이전트(coder/qa-manager) 미호출. implement는 red-writer·implementer만 디스패치(green/refactor-coder 미호출 — 단독 스킬 전용)하고 인계는 reports/t{N}-*.md 경로로 관찰. review는 reviewer(통합 1석)·security-auditor 디스패치(Step 0 Mechanical Gate의 수리 디스패치는 별도) — Step 4b 정리도 implementer | tdd Agent 팀 강제 |
+| S9 | 대화형 tdd의 정상 implement/review 진행 관찰 (ralph 및 누적 fix 격리 전환 제외) | (관찰 항목) | deprecated 에이전트(coder/qa-manager) 미호출. implement는 red-writer를 디스패치하고 기본 경로의 구현·정리는 세션이 직접 수행한다. `--isolated` 등 격리 경로에서 implementer를 추가 디스패치한다(green/refactor-coder 미호출 — 단독 스킬 전용)하고 인계는 reports/t{N}-*.md 경로로 관찰. review는 reviewer(통합 1석)·security-auditor 디스패치(Step 0 Mechanical Gate의 수리 디스패치는 별도) — Step 4b 정리도 기본은 세션 직접 수행, `--isolated`는 implementer | tdd Agent 팀 강제 |
 | S10 | reviewer·security 리뷰 완료 | (관찰 항목) | reviewer 출력 마지막에 spec_verdict → quality_verdict 두 블록 순서 고정 + security 출력에 security_verdict — verdict/집계가 산문과 일치 | phase-review Step 4.0/SPEC FAIL 처리 |
 | S11 ★ | 일반 프로젝트 | `/dev {소형 변경}, 구현만 해줘` | 핵심 모드(core) 라우팅 — ac.md 작성 + AC 확인 질문 1회 → 구현 → **빌드·테스트 Gate 실행** → summary.md 기록 → 커밋/PR. Gate 없이 complete 진입하면 회귀 | dev 의도 파싱 → phase-core Step 2 |
 | S12 | 일반 프로젝트 | `/dev {버그} 긴급 수정해줘` | 핵심 모드 라우팅 — AC를 재현 조건 형식으로 작성 + **확인 질문 1회 실행**(생략 없음), Gate 필수. product-owner 디스패치 0회 | dev 의도 파싱 → phase-core Step 0/0.5 |
@@ -52,7 +52,7 @@ printf 'pipeline: tdd\nstatus: in_progress\nverify-status: pending\n' > .dev/{br
 | S33 | `.dev/plan.md`에 W01(진행)이 있고 구현·리뷰가 끝난 상태 | `/tdd --work W01 --phase complete` | state.md에 `work-id: W01`이 기록되고 그 행이 `완료`로 갱신됨. **`--work`가 무시되어 아무 갱신도 없으면 회귀** — 이 경로는 phase-setup을 건너뛰므로 3.0.5가 실행되지 않는다 | SKILL.md 환경 감지 work-id 항목 |
 | S34 | tdd review phase 진행 중, security-auditor가 판정 블록도 산문 집계도 없는 출력을 반환 | `/tdd --phase review` | 집계 미확보로 판별 → security-auditor 1회 재호출 → 재호출도 집계가 없으면 AskUserQuestion("위험 수용(원장 기록 후 진행)" / "중단")이 제시됨. **조용히 `CRITICAL 0건`으로 요약에 넘어가면 회귀** — 감사 없이 통과하는 경로다 | phase-review Step 4.0 security_verdict fail-closed |
 | S35 | 구현에 확신이 낮은 품질 관찰이 여러 건 있는 diff | `/tdd --phase review` | reviewer가 저확신 항목을 **Minor로 강등하되 보고에는 남긴다**. 확신이 낮다는 이유로 항목이 사라지면 회귀. Minor는 비차단이므로 `quality_verdict`는 PASS를 유지한다 — 저확신 관찰이 전부 Important로 올라와 fix loop가 요동쳐도 회귀 | agents/reviewer.md Part 2 커버리지 문단 |
-| S36 ★ | ralph 루프 반복 중, 모델이 "다음으로 …하겠습니다"로 턴을 끝내려는 상황 | 러너 `bash scripts/gx-ralph.sh` 실행 | 반복 세션이 설명 대신 도구를 호출해 그 일을 수행하고, 마지막 줄에 종료 계약(`COMPLETE`/`CONTINUE`/`BLOCKED`)을 출력한다. **러너가 종료 코드 3(계약 미출력)으로 끝나면 회귀.** 단 Step 0 가드 실패·Step 3 verify 차단·하네스 부재는 예외이며, 그 경우 즉시 해당 종료 계약을 내는 것이 정상이다 | ralph-iterate 철칙 6번 + 예외 절 |
+| S36 ★ | ralph 루프 반복 중, 모델이 "다음으로 …하겠습니다"로 턴을 끝내려는 상황 | ralph가 안내한 설치 러너 절대경로 명령 실행 | 반복 세션이 설명 대신 도구를 호출해 그 일을 수행하고, 마지막 줄에 종료 계약(`COMPLETE`/`CONTINUE`/`BLOCKED`)을 출력한다. **러너가 종료 코드 3(계약 미출력)으로 끝나면 회귀.** 단 Step 0 가드 실패·Step 3 verify 차단·하네스 부재는 예외이며, 그 경우 즉시 해당 종료 계약을 내는 것이 정상이다 | ralph-iterate 철칙 6번 + 예외 절 |
 | S37 | 새 요청(ARGS 있음)이며 `--resume`·`--work`·W-토큰이 없는 tdd 실행 | `/tdd 알림 임계값 검증 TDD로 구현해줘` | phase-setup이 `phases/setup-resume.md`·`phases/setup-work.md`를 **Read하지 않고** Step 1로 진입한다 (도구 호출 기록에 두 파일이 없음). `--resume`으로 재실행하면 `setup-resume.md`만 Read한다 | phase-setup Step 0 조건부 Read + Step 3.0.5 작업 계획 참조 |
 | S38 ★ | AC 2개(각 시나리오 2~3건)짜리 전체 모드 tdd 실행, `--isolated` 없음 | `/tdd 포인트 충전 한도 검증 TDD로 구현해줘` | 태스크 2개로 분해된다. 태스크마다 red-writer **1회**만 디스패치되고 implementer 디스패치는 없다. 세션이 실패 케이스를 하나씩 통과시키며 `reports/t{N}-impl.md`를 직접 Write한다. state.md 태스크 객체에 `test-file-hash`·`test-count`가 기록되고 execution-log에 `session-implement (T{N})`가 남는다 | phase-implement Step 2-I 세션 IMPLEMENT 절차 + 린트 [33/36] |
 | S39 | 같은 요청에 `--isolated` | `/tdd --isolated 포인트 충전 한도 검증 TDD로 구현해줘` | 태스크마다 red-writer → implementer **2회** 디스패치. state.md `flags`에 `--isolated`. 나머지 검증(해시·focused 직접 실행)은 S38과 동일 | phase-setup Step 7 flags 기록 + phase-implement Step 2-I 격리 경로 |
@@ -80,7 +80,7 @@ printf 'pipeline: tdd\nstatus: in_progress\nverify-status: pending\n' > .dev/{br
 
 위 Claude Code 시나리오 및 `scripts/behavior-tests.sh`의 Claude CLI 결과와 별도로, [codex-smoke.md](codex-smoke.md)의 H/R/Q/S 시나리오와 네이티브 실행 검증을 수행한다. Codex의 훅 판정·도구 API·역할 전달은 Claude와 다르므로 Claude mock 통과만으로 Codex 지원을 판정하지 않는다.
 
-실제 설치 캐시에서 스킬 17개와 역할 리소스를 확인하고, setup→TDD→교차 리뷰→verify→커밋 준비를 새 소비 프로젝트에서 3회 실행한다. 하네스 버전, 운영체제, 훅 신뢰, 실제 모델과 에이전트 실행 증거를 기록하며, 미실행 항목은 NOT_RUN으로 남긴다. 보호 브랜치, verify 미통과 및 stale fingerprint 차단은 실제 훅 결과와 HEAD/index 불변으로 확인한다.
+실제 설치 캐시에서 스킬 18개와 역할 리소스를 확인하고, setup→TDD→교차 리뷰→verify→커밋 준비를 새 소비 프로젝트에서 3회 실행한다. 하네스 버전, 운영체제, 훅 신뢰, 실제 모델과 에이전트 실행 증거를 기록하며, 미실행 항목은 NOT_RUN으로 남긴다. 보호 브랜치, verify 미통과 및 stale fingerprint 차단은 실제 훅 결과와 HEAD/index 불변으로 확인한다.
 
 ## 결과 기록
 

@@ -35,7 +35,15 @@ if [ -z "$CMD" ]; then
       out = ""
       while (j <= n) {
         c = substr(rest, j, 1)
-        if (c == "\\") { out = out c substr(rest, j + 1, 1); j += 2; continue }
+        if (c == "\\") {
+          e = substr(rest, j + 1, 1)
+          if (e == "n") out = out "\n"
+          else if (e == "r") out = out "\r"
+          else if (e == "t") out = out "\t"
+          else if (e == "\\" || e == "\042" || e == "/") out = out e
+          else out = out c e
+          j += 2; continue
+        }
         if (c == "\"") break
         out = out c; j++
       }
@@ -140,34 +148,82 @@ esac
 
 # G1: preserve existing protected-branch and detached-HEAD policy before any verify ask.
 # The old Ttutak guard resolves each command segment independently, including -Cdir.
+# Tokenize without evaluating shell input. Only Git global options before the
+# subcommand can change its repository; commit messages and config values cannot.
 segment_git_path() {
-  local git_path="." temp_seg="$1"
-  while [[ "$temp_seg" =~ -C[[:space:]]*(\"([^\"]+)\"|\'([^\']+)\'|([^[:space:]]+))(.*) ]]; do
-    local next_path="${BASH_REMATCH[2]}${BASH_REMATCH[3]}${BASH_REMATCH[4]}"
-    temp_seg="${BASH_REMATCH[5]}"
-    case "$next_path" in
-      /*|[A-Za-z]:[\\/]*) git_path="$next_path" ;;
-      "") : ;;
-      *) git_path="$git_path/$next_path" ;;
-    esac
-  done
-  printf '%s' "$git_path"
+  printf '%s\n' "$1" | awk '
+    function flush() { if (active) { t[++n] = word; word = ""; active = 0 } }
+    function tokenize(source) {
+      n = 0; word = ""; active = 0; quote = ""; escaped = 0
+      for (i = 1; i <= length(source); i++) {
+        c = substr(source, i, 1)
+        if (escaped) { word = word c; active = 1; escaped = 0; continue }
+        if (quote == "\047") {
+          if (c == quote) quote = ""; else word = word c
+          continue
+        }
+        if (c == "\\") { escaped = 1; active = 1; continue }
+        if (quote != "") {
+          if (c == quote) quote = ""; else word = word c
+          continue
+        }
+        if (c == "\042" || c == "\047") { quote = c; active = 1; continue }
+        if (c ~ /[[:space:]()]/) { flush(); continue }
+        word = word c; active = 1
+      }
+      flush()
+    }
+    { tokenize($0) }
+    END {
+      # Preserve simple bash/sh/zsh -c wrappers without executing their payload.
+      for (depth = 0; depth < 3; depth++) {
+        wrapped = ""
+        for (j = 1; j < n; j++) {
+          if ((t[j] == "bash" || t[j] == "sh" || t[j] == "zsh") && t[j + 1] == "-c") { wrapped = t[j + 2]; break }
+        }
+        if (wrapped == "") break
+        tokenize(wrapped)
+      }
+      found = 0
+      for (candidate = 1; candidate <= n; candidate++) {
+        if (t[candidate] != "git") continue
+        path = "."
+        for (j = candidate + 1; j <= n; j++) {
+          arg = t[j]
+          if (arg == "-C") { if (++j > n) break; dir = t[j] }
+          else if (substr(arg, 1, 2) == "-C") dir = substr(arg, 3)
+          else if (arg == "-c" || arg == "--git-dir" || arg == "--work-tree" || arg == "--namespace" || arg == "--config-env") { j++; continue }
+          else if (substr(arg, 1, 1) == "-") continue
+          else { if (arg == "commit") { print path; found = 1 }; break }
+          if (dir ~ /^\// || dir ~ /^[A-Za-z]:[\\\/]/) path = dir
+          else if (dir != "") path = path "/" dir
+        }
+        candidate = j
+      }
+      if (!found) exit 1
+    }'
 }
 
-NORMALIZED=$(printf '%s' "$CMD" | tr ';|&' '\n')
+# Split only unquoted command separators, preserving message/path quoting.
+NORMALIZED=$(printf '%s\n' "$CMD" | awk '
+  {
+    for (i = 1; i <= length($0); i++) {
+      c = substr($0, i, 1)
+      if (escaped) { printf "%s", c; escaped = 0; continue }
+      if (quote == "\047") { printf "%s", c; if (c == quote) quote = ""; continue }
+      if (c == "\\") { printf "%s", c; escaped = 1; continue }
+      if (quote != "") { printf "%s", c; if (c == quote) quote = ""; continue }
+      if (c == "\042" || c == "\047") { quote = c; printf "%s", c; continue }
+      if (c ~ /[;|&]/) printf "\n"; else printf "%s", c
+    }
+    printf "\n"
+  }')
 DENY_REASON=""
 check_segment() {
   local seg="$1"
-  if [[ ! "$seg" =~ (^|[[:space:]\;\&\|\(\"])git([[:space:]]+[^[:space:]]+)*[[:space:]]+commit([[:space:]]|\"|$) ]]; then
-    return 1
-  fi
-
-  # `-C` 옵션 추출:
-  #   - 공백 없는 `-C/path` 형식 지원 (`-C[[:space:]]*`)
-  #   - 여러 `-C`가 있으면 git은 마지막 것을 적용하므로 루프로 마지막 매치를 찾는다
-  local git_path
-  git_path=$(segment_git_path "$seg")
-
+  local git_path git_paths
+  git_paths=$(segment_git_path "$seg") || return 1
+  while IFS= read -r git_path; do
   local branch
   branch=$(git -C "$git_path" symbolic-ref --short HEAD 2>/dev/null || echo "")
   if [ -z "$branch" ]; then
@@ -175,7 +231,7 @@ check_segment() {
       DENY_REASON="detached HEAD 상태에서는 커밋할 수 없습니다. 작업 브랜치를 먼저 생성하거나 checkout 하세요."
       return 0
     fi
-    return 1
+    continue
   fi
 
   if [[ "$branch" =~ ^(develop|main|master)$ ]]; then
@@ -183,6 +239,7 @@ check_segment() {
     return 0
   fi
 
+  done <<< "$git_paths"
   return 1
 }
 
@@ -203,8 +260,8 @@ done <<< "$NORMALIZED"
 
 # G3 evaluates the same command segment/repository, without matching commitstats.
 while IFS= read -r seg; do
-  [[ "$seg" =~ (^|[[:space:]\;\&\|\(\"])git([[:space:]]+[^[:space:]]+)*[[:space:]]+commit([[:space:]]|\"|$) ]] || continue
-  GIT_DIR=$(segment_git_path "$seg")
+  GIT_PATHS=$(segment_git_path "$seg") || continue
+  while IFS= read -r GIT_DIR; do
   CURRENT_BRANCH=$(git -C "$GIT_DIR" symbolic-ref --short HEAD 2>/dev/null || echo "")
     # G3: tdd verify 게이트 — 미통과 상태의 커밋은 사용자 확인(ask)을 요구
     # deny가 아닌 ask인 이유: 스킬/라우팅 층에 문서화된 "위험 수용" 경로를 보존하면서,
@@ -248,6 +305,7 @@ EOF
         exit 0
       fi
     fi
+  done <<< "$GIT_PATHS"
 done <<< "$NORMALIZED"
 
 # G2: SVN 직접 커밋 차단 — Claude 대신 사용자가 터미널에서 실행 (+ verify 미통과 경고)
