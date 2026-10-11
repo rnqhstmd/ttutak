@@ -40,6 +40,32 @@ class GuardTests(unittest.TestCase):
                         out = hook.run_guard({"cwd": cwd, "tool_input": {"command": command}})
                         self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
 
+    def test_real_guard_preserves_double_quoted_backslashes(self):
+        """A quoted Windows path must retain ordinary backslashes on all hosts."""
+        with tempfile.TemporaryDirectory() as cwd:
+            # POSIX can represent a literal Windows-looking name, exercising the
+            # same parser without requiring Windows; Windows uses its real path.
+            repo = Path(cwd) / ("guard parity" if os.name == "nt" else r"C:\Users\guard parity")
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "main"], check=True)
+            command_path = str(repo) if os.name == "nt" else repo.name
+            commands = [
+                f'git -C "{command_path}" commit -m "fix -C /tmp/nonexistent-parity-dir"',
+                f'git -C"{command_path}" commit -m "fix"',
+            ]
+            for branch in ("main", "feat/parity"):
+                if branch != "main":
+                    subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", branch], check=True)
+                    state = repo / ".dev/feat-parity/state.md"
+                    state.parent.mkdir(parents=True)
+                    state.write_text("pipeline: tdd\nstatus: in_progress\nverify-status: pending\n", encoding="utf-8")
+                for command in commands:
+                    with self.subTest(branch=branch, command=command):
+                        out = hook.run_guard({"cwd": cwd, "tool_input": {"command": command}})
+                        self.assertIsNotNone(out)
+                        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
+
     def test_ask_becomes_deny(self):
         """Changing the Codex ask conversion to pass-through must fail here."""
         answer = {

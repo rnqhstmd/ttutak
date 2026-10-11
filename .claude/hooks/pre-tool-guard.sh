@@ -162,7 +162,15 @@ segment_git_path() {
           if (c == quote) quote = ""; else word = word c
           continue
         }
-        if (c == "\\") { escaped = 1; active = 1; continue }
+        if (c == "\\") {
+          # In double quotes POSIX shells preserve backslashes before ordinary
+          # characters (notably C:\Users). Only shell-special characters escape.
+          next_char = substr(source, i + 1, 1)
+          if (quote == "\042" && next_char != "$" && next_char != "`" && next_char != "\042" && next_char != "\\" && next_char != "\n") {
+            word = word c; active = 1; continue
+          }
+          escaped = 1; active = 1; continue
+        }
         if (quote != "") {
           if (c == quote) quote = ""; else word = word c
           continue
@@ -211,7 +219,12 @@ NORMALIZED=$(printf '%s\n' "$CMD" | awk '
       c = substr($0, i, 1)
       if (escaped) { printf "%s", c; escaped = 0; continue }
       if (quote == "\047") { printf "%s", c; if (c == quote) quote = ""; continue }
-      if (c == "\\") { printf "%s", c; escaped = 1; continue }
+      if (c == "\\") {
+        printf "%s", c
+        next_char = substr($0, i + 1, 1)
+        if (quote != "\042" || next_char == "$" || next_char == "`" || next_char == "\042" || next_char == "\\" || next_char == "\n") escaped = 1
+        continue
+      }
       if (quote != "") { printf "%s", c; if (c == quote) quote = ""; continue }
       if (c == "\042" || c == "\047") { quote = c; printf "%s", c; continue }
       if (c ~ /[;|&]/) printf "\n"; else printf "%s", c
