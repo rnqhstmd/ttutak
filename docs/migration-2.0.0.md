@@ -43,7 +43,7 @@ macOS에서 소스 이식과 하네스용 배포 파일을 검증했습니다. �
 - Python 회귀: `python3 -m unittest discover -s tests -p 'test_*.py' -v` — 164개 실행, 실패 0개, Windows 전용 5개 건너뜀(159개 통과). 이식·릴리스 호환성 12개 포함.
 - 정합성 린트 36항목, 기존 ttutak 보호 훅 17개, 최신 훅 6그룹, Ralph mock 36개, 행동 테스트 mock 30개 통과.
 - Codex 생성물 `--check`와 `git diff --check` 통과. 독립 리뷰에서 발견한 `git -C`/복합 명령/detached HEAD 보호 회귀와 Spring `projectTypes[type].test` 설정 경로 오류를 수정하고 재검증.
-- CI는 Linux에서 기존 보호 훅·이식 호환성을, Linux/Windows에서 Codex 계약을 검사하도록 구성. Windows CI 실행 결과는 PR에서 별도로 확인해야 함.
+- CI는 Linux에서 기존 보호 훅·이식 호환성을, Linux/Windows에서 Codex 계약을 검사하도록 구성. [GitHub Actions 실행 38123694252](https://github.com/rnqhstmd/ttutak/actions/runs/38123694252)의 커밋 `e39ada5`에서 consistency·Ubuntu Codex 계약·Windows Codex 계약 3개 job 모두 통과. Windows의 실제 인증 모델 실행과는 별개인 오프라인 계약 검증 결과임.
 - 브라우저에서 홈페이지 표시 이름·스킬 수·설치 안내와 최신 TDD 설명 확인.
 
 - Claude Code CLI 2.1.227에서 `plugin uninstall`, `plugin marketplace remove` 지원을 도움말로 확인.
