@@ -1,7 +1,6 @@
 ---
 name: tech-debt
-version: 1.0.0
-description: 코드베이스의 기술 부채를 분석하고 우선순위 로드맵을 제공한다 (읽기 전용)
+description: 코드베이스의 기술 부채를 분석하고 우선순위 로드맵을 제공한다. "기술 부채", "부채 분석", "부채 확인" 시 사용.
 argument-hint: "[도메인|경로] [--type code|arch|deps|test|all]"
 allowed-tools:
   # 파일시스템 (읽기 전용)
@@ -17,24 +16,37 @@ allowed-tools:
   - Bash(git log *)
   - Bash(git diff *)
   - Bash(git branch *)
+  - Bash(svn info *)
   # 의존성 확인 (읽기 전용)
   - Bash(./gradlew dependencies)
   - Bash(npm outdated *)
   - Bash(npm audit *)
   - Bash(pip list *)
-  - Bash(pip audit *)
+  - Bash(pip-audit *)
+  - Bash(cargo tree *)
+  - Bash(cargo audit *)
   # 읽기 도구
   - Read
   - Glob
   - Grep
   # 오케스트레이션
-  - Agent
+  - Task
   - AskUserQuestion
 ---
 
 코드베이스의 기술 부채를 유형별로 분석하고, 심각도와 수정 비용을 기반으로 우선순위 로드맵을 제공한다.
 
 항상 한국어로 응답한다.
+
+**하네스 적응**: 이 문서는 Claude Code 도구명으로 서술한다. 다른 하네스에서 실행 중이면 아래 대응으로 옮겨 수행한다.
+
+Codex에서는 먼저 `Read("../dev/references/codex-runtime.md")`로 공통 실행 규약을 읽고, 이 스킬의 절차·게이트를 유지한다. 상대경로는 이 SKILL.md 위치 기준이다.
+Codex on Windows: read this SKILL.md and referenced files as UTF-8; use `Get-Content -Encoding UTF8`.
+
+- `AskUserQuestion` → `request_user_input`. 그 도구를 쓸 수 없으면 자연어로 묻되, **승인 없이 다음 단계로 넘어가지 않는다**는 계약은 그대로 지킨다.
+- `Task(subagent_type="Explore")` → `spawn_agent`의 읽기 전용 탐색 에이전트. 대응 타입이 없으면 디스패치를 접고 오케스트레이터가 `Grep`·`Read`로 직접 탐색한다 — 탐색 범위와 보고 항목은 그대로 유지한다.
+
+도구 이름이 다르다는 이유로 게이트를 건너뛰지 않는다. 확인·검증 단계는 하네스와 무관하게 유지한다.
 
 ## 페르소나
 
@@ -70,8 +82,10 @@ allowed-tools:
 
 ### 0-1: 프로젝트 루트 및 타입 감지
 
-1. `git rev-parse --show-toplevel`로 프로젝트 루트 확인.
-2. `.claude/config.json`의 `projectTypes.detect` 설정을 기준으로 프로젝트 타입을 우선 감지한다 (commit/test/dev 스킬과 동일한 방식).
+1. VCS에 따라 프로젝트 루트를 확인한다.
+   - git: `git rev-parse --show-toplevel`
+   - svn: `svn info`의 Working Copy Root Path, 또는 `pwd`
+2. `.claude/config.json`의 `projectTypes.detect` 설정을 기준으로 프로젝트 타입을 우선 감지한다 (commit/dev 스킬과 동일한 방식).
 3. config에서 타입을 판단할 수 없는 경우에만 빌드/설정 파일을 추가 단서로 사용한다:
    - `build.gradle.kts` / `build.gradle` → java/kotlin
    - `package.json` → node
@@ -87,16 +101,20 @@ allowed-tools:
    "프로젝트가 큽니다 (N개 파일). 특정 도메인이나 디렉토리로 범위를 좁힐까요?"
    ```
 
-### 0-3: context 연동
+### 0-3: context / references 연동
 
 `context/` 디렉토리가 존재하고, TARGET이 도메인명이면:
 - `context/{도메인}/architecture.md`를 Read하여 의도된 아키텍처를 파악한다.
 - 이후 아키텍처 부채 분석에서 "의도된 구조 vs 실제 구조" 비교에 사용한다.
 
+`references/` 디렉토리가 존재하면:
+- 디렉토리 하위 문서 목록을 Glob으로 수집한다.
+- 시큐어코딩·API 표준·eGovFrame 규칙 등 프로젝트가 준수해야 하는 외부 규격 문서가 있는 경우, 아키텍처/코드 부채 분석에서 해당 규격 준수 여부를 보조 판단 근거로 활용한다.
+
 ## 공유 상수
 
-- `SOURCE_EXTENSIONS`: `"*.{kt,java,ts,tsx,js,jsx,py,go,rs,swift}"`
-- `EXCLUDE_PATHS`: `build/, out/, dist/, target/, .gradle/, node_modules/, .dev/, .claude/, .github/, venv/, .venv/, __pycache__/`
+- `SOURCE_EXTENSIONS`: `"*.{kt,java,ts,tsx,js,jsx,py,go,rs,swift,scala,groovy}"`
+- `EXCLUDE_PATHS`: `build/, out/, dist/, target/, .gradle/, node_modules/, .dev/, .claude/, .github/, .git/, .svn/, venv/, .venv/, __pycache__/, worktrees/`
 
 Agent 프롬프트에 위 상수를 포함하여 빌드 산출물과 의존성 디렉토리를 탐색 대상에서 제외한다.
 
@@ -111,15 +129,15 @@ ANALYSIS_TYPE에 따라 해당 유형만 실행하거나, `all`이면 전체 실
 
 ### 1-1: 코드 부채 (`code`)
 
-`Agent(subagent_type="Explore")` — 다음을 탐색한다:
+`Task(subagent_type="Explore")` — 다음을 탐색한다:
 
 **중복 코드:**
 - 유사한 로직이 여러 파일에 반복되는 패턴을 Grep으로 탐색한다.
 - 같은 이름의 메서드가 다른 클래스에 존재하는지 확인한다.
 
 **복잡도:**
-- 파일 크기가 300줄을 초과하는 파일을 식별한다.
-- 한 클래스/모듈에 public 메서드가 15개 이상인 경우를 식별한다 (God 클래스 후보).
+- 파일 크기가 500줄을 초과하는 파일을 식별한다 (공공 SI 레거시 코드베이스 기준).
+- 한 클래스/모듈에 public 메서드가 20개 이상인 경우를 식별한다 (God 클래스 후보).
 - 깊은 중첩 (3단계 이상 if/for) 패턴을 Grep으로 탐색한다.
 
 **Dead Code:**
@@ -141,7 +159,7 @@ ANALYSIS_TYPE에 따라 해당 유형만 실행하거나, `all`이면 전체 실
 
 ### 1-2: 아키텍처 부채 (`arch`)
 
-`Agent(subagent_type="Explore")` — 다음을 탐색한다:
+`Task(subagent_type="Explore")` — 다음을 탐색한다:
 
 **순환 의존성:**
 - import/require 문을 분석하여 A→B→A 패턴을 탐지한다.
@@ -159,14 +177,17 @@ ANALYSIS_TYPE에 따라 해당 유형만 실행하거나, `all`이면 전체 실
 **설정/상수 산재:**
 - 매직 넘버/하드코딩된 문자열이 코드 곳곳에 흩어진 경우를 탐지한다.
 
+**외부 규격 위반 (references 연동):**
+- `references/` 문서에 명시된 금지 패턴이나 필수 규칙이 있으면, 해당 규칙을 위반하는 코드를 식별한다.
+
 ### 1-3: 의존성 부채 (`deps`)
 
-프로젝트 타입별로 의존성 상태를 확인한다:
+config `projectTypes`에서 감지된 타입 기준으로 의존성 상태를 확인한다 (**SSOT는 config**). 아래에 분석 절차가 정의된 생태계만 실행한다.
 
 **java/kotlin:**
 1. `build.gradle.kts` 또는 `build.gradle`을 Read하여 의존성 목록을 파악한다.
-2. `./gradlew dependencies` 실행이 가능하면 (`timeout: 60000`) 의존성 트리를 확인한다.
-3. 주요 프레임워크 버전 (Spring Boot, JDK 등)의 EOL 여부를 확인한다.
+2. `./gradlew dependencies` 실행이 가능하면 (`timeout: 180000`) 의존성 트리를 확인한다. Gradle은 대규모 프로젝트에서 캐시 워밍업과 그래프 구성에 1분 이상 소요되는 경우가 빈번하므로 3분으로 설정한다.
+3. 주요 프레임워크 버전 (Spring Boot, JDK, eGovFrame 등)의 EOL 여부를 확인한다.
 
 **node:**
 1. `package.json`을 Read하여 의존성 목록을 파악한다.
@@ -177,14 +198,19 @@ ANALYSIS_TYPE에 따라 해당 유형만 실행하거나, `all`이면 전체 실
 1. `requirements.txt` 또는 `pyproject.toml`을 Read한다.
 2. 버전 고정 여부 (pinned vs unpinned)를 확인한다.
 3. `pip list --outdated --format=json` (`timeout: 30000`)으로 업데이트 가능한 패키지를 확인한다. non-zero 종료코드 시에도 stdout JSON을 우선 파싱한다.
-4. `pip audit --format=json` (`timeout: 30000`)이 실행 가능하면 알려진 취약점을 확인한다. 동일하게 stdout 기준으로 파싱한다.
+4. `pip-audit --format=json` (`timeout: 30000`)이 실행 가능하면 알려진 취약점을 확인한다. 동일하게 stdout 기준으로 파싱한다.
 
-**범용 (감지 불가):**
-- 이 유형을 건너뛴다.
+**rust:**
+1. `Cargo.toml`을 Read하여 의존성 목록을 파악한다.
+2. `cargo tree --depth 1` (`timeout: 60000`)로 직접 의존성을 확인한다.
+3. `cargo audit --json` (`timeout: 60000`)이 실행 가능하면 알려진 취약점을 확인한다. 미설치면 건너뛰고 보고에 명시한다. 취약점 발견 시 non-zero 종료코드를 반환하므로 종료코드와 무관하게 stdout JSON을 우선 파싱한다.
+
+**그 외 (분석 절차 미정의 타입·감지 불가):**
+- 건너뛰지 않고 보고서에 명시 기재한다: "의존성 분석 미지원 — 수동 확인 필요 (vendored 라이브러리, git 서브모듈, 시스템 패키지 여부를 직접 점검하세요)". C/Make처럼 패키지 매니저가 없는 생태계가 여기 해당한다. 조용한 생략 금지.
 
 ### 1-4: 테스트 부채 (`test`)
 
-`Agent(subagent_type="Explore")` — 다음을 탐색한다:
+`Task(subagent_type="Explore")` — 다음을 탐색한다:
 
 **커버리지 구조:**
 1. 소스 디렉토리와 테스트 디렉토리의 파일을 매칭한다.

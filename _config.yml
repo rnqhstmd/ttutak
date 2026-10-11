@@ -1,9 +1,8 @@
-title: ttutak
-description: AI 기반 개발 자동화 Claude Code 플러그인
+title: Ttuk Ttak
+description: 아이디어를 코드로, 뚝딱 — Claude Code · Codex 언어 중립 개발 자동화 플러그인
 remote_theme: pages-themes/cayman@v0.2.0
 plugins:
   - jekyll-remote-theme
-
 exclude:
   - .claude
   - context

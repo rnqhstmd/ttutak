@@ -1,6 +1,6 @@
 ---
 name: test
-version: 1.0.0
+version: 2.0.0
 description: 도메인별 단위/통합/E2E 테스트를 작성하고 커버리지를 검증한다
 argument-hint: "[도메인] [--type unit|integration|e2e|all] [--coverage 80]"
 allowed-tools:
@@ -36,6 +36,15 @@ allowed-tools:
 도메인별로 단위/통합/E2E 테스트를 분석·작성하고, 커버리지 기준을 검증한다.
 
 항상 한국어로 응답한다.
+
+**하네스 적응**: 이 문서는 Claude Code 도구명으로 서술한다. Codex에서는 먼저 `Read("../dev/references/codex-runtime.md")`로 공통 실행 규약을 읽고 이 스킬의 절차·게이트를 유지한다. 상대경로는 이 SKILL.md 위치 기준이다.
+Codex on Windows: read this SKILL.md and referenced files as UTF-8; use `Get-Content -Encoding UTF8`.
+
+- `Task(subagent_type="ttuk-ttak:coder")` → `spawn_agent`로 `../dev/references/codex-roles/coder.md` 역할 본문과 프로젝트 루트·테스트 계획을 전달한다. 서브에이전트 도구가 없으면 같은 역할 계약으로 순차 실행한다.
+- `AskUserQuestion` → `request_user_input`. 도구가 현재 모드에서 제공되지 않으면 자연어로 질문하고 응답을 기다린다. 이미 사용자가 구체적 테스트 계획을 승인했다면 재승인하지 않는다.
+- `Read`/`Glob`/`Grep`/`Bash` → 현재 하네스의 파일 읽기·검색·명령 실행 도구. 질문·검증 게이트를 도구 이름 차이로 생략하지 않는다.
+
+이 스킬은 기존 Spring 도메인의 테스트 보강 전용이다. 새 기능의 RGR 구현은 `ttuk-ttak:tdd`, 최종 코드 검증은 `ttuk-ttak:verify`로 진행한다. `test` 통과만으로 파이프라인의 `verify-status`·`verify-fingerprint`를 변경하지 않는다.
 
 ## 지원 프로젝트 타입
 
@@ -73,7 +82,8 @@ ARGS를 파싱하여 아래 변수를 결정한다:
 ### 0-1: 프로젝트 루트 및 타입
 
 1. `git rev-parse --show-toplevel`로 프로젝트 루트 확인.
-2. `.claude/config.json`의 `projectTypes`에서 프로젝트 타입을 감지한다.
+2. 프로젝트 루트의 `.claude/config.json`을 읽고 `projectTypes[*].detect`를 검사하여 등록된 타입을 감지한다. 설정이 없으면 번들 `../setup/references/config.template.json`을 초기값으로 사용하되 기존 프로젝트 설정을 덮어쓰지 않는다.
+3. 복수 타입이면 감지한 타입 중 `java-spring` 또는 `kotlin-gradle`의 실제 Spring Boot 의존성을 확인한다. 일반 Kotlin 프로젝트를 Spring으로 오인하지 않는다. 대상 Spring 모듈의 루트를 명령 실행 cwd로 정한다.
 
 ### 0-2: 테스트 프레임워크 감지
 
@@ -202,7 +212,7 @@ AskUserQuestion으로 승인/수정을 받은 후 Step 3으로 진행한다.
 1. **단위 테스트** → 2. **통합 테스트** → 3. **E2E 테스트**
 
 각 유형별로:
-1. `Task(subagent_type="coder")`에 다음을 전달:
+1. `Task(subagent_type="ttuk-ttak:coder")`에 다음을 전달:
    - 대상 소스 코드
    - 기존 테스트 스타일 (TEST_CONVENTIONS)
    - 테스트 계획의 해당 유형 항목
@@ -229,19 +239,13 @@ AskUserQuestion으로 승인/수정을 받은 후 Step 3으로 진행한다.
 
 ### 4-1: 테스트 실행
 
-프로젝트 타입별 테스트 명령을 실행한다 (`timeout: 300000`):
-
-| 프로젝트 타입 | 테스트 명령 |
-|--------------|-----------|
-| java-spring | `./gradlew test` |
-| node | `npm test` 또는 `bun test` |
-| python | `pytest` |
+Step 0에서 선택한 Spring 모듈의 `projectTypes[{PROJECT_TYPE}].test`를 실행한다 (`timeout: 300000`). `./gradlew` 또는 Maven wrapper 등 프로젝트에 등록된 실제 명령을 사용한다. 명령이 없거나 러너가 설치되지 않았으면 성공으로 처리하지 않고 하네스 구축이 필요함을 보고한다.
 
 ### 4-2: 실패 처리
 
 테스트 실패 시:
 1. 실패 로그를 분석하여 원인을 파악한다.
-2. `Task(subagent_type="coder")`에 실패 로그와 테스트 코드를 전달하여 수정 요청.
+2. `Task(subagent_type="ttuk-ttak:coder")`에 실패 로그와 테스트 코드를 전달하여 수정 요청.
 3. 수정 후 테스트를 **1회 재실행**한다.
 4. 재실행도 실패하면 사용자에게 실패 목록을 보고하고 진행 여부를 확인한다.
 
@@ -253,15 +257,9 @@ AskUserQuestion으로 승인/수정을 받은 후 Step 3으로 진행한다.
 - `./gradlew jacocoTestReport` 실행 (JaCoCo 플러그인이 있으면)
 - 보고서에서 도메인 패키지의 커버리지를 추출
 
-**node**:
-- `npm test -- --coverage` 또는 `bun test --coverage`
-- 커버리지 요약에서 대상 디렉토리의 수치를 추출
+**kotlin-gradle**: Spring 모듈에 JaCoCo 또는 Kover가 등록되어 있으면 해당 보고서 명령을 실행한다. 등록되지 않은 명령을 임의로 실행하지 않는다.
 
-**python**:
-- `pytest --cov={도메인 패키지}`
-- 커버리지 요약을 추출
-
-커버리지 도구가 없거나 실행 불가 시 이 단계를 건너뛴다.
+커버리지 도구가 없거나 실행 불가 시 `미측정`으로 명시한다. 추정치를 실제 커버리지로 보고하거나 목표 달성을 주장하지 않는다.
 
 ## Step 5: 결과 보고
 

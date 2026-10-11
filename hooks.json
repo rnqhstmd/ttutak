@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/.claude/hooks/codex_hook.py\" guard",
+            "commandWindows": "python \"${PLUGIN_ROOT}/.claude/hooks/codex_hook.py\" guard",
+            "timeout": 35
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "AskUserQuestion|request_user_input",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/.claude/hooks/codex_hook.py\" capture",
+            "commandWindows": "python \"${PLUGIN_ROOT}/.claude/hooks/codex_hook.py\" capture",
+            "timeout": 35
+          }
+        ]
+      }
+    ]
+  }
+}

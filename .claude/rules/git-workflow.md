@@ -1,12 +1,20 @@
-# Git 워크플로우
+# VCS 워크플로우
 
-## 브랜치 규칙
+이 규칙은 `.claude/config.json`의 `"vcs"` 값에 따라 분기한다.
 
-코드를 수정할 때는 **main에서 직접 수정하지 마세요.**
+---
+
+## Git 워크플로우 (vcs: "git" 또는 미설정)
+
+**이 섹션은 `config.json`의 `vcs`가 `"git"`이거나 미설정(`""`)일 때만 적용한다. `"svn"`이면 아래 SVN 섹션을 따른다.**
+
+### 브랜치 규칙
+
+코드를 수정할 때는 **보호 브랜치(main/master/develop)에서 직접 수정하지 마세요.** (PreToolUse 훅 `pre-tool-guard.sh`가 이 세 브랜치의 커밋을 차단한다.)
 
 1. **파일을 수정하기 전에** 작업 브랜치를 먼저 생성하세요. 수정 후에 브랜치를 만드는 것이 아니라, 브랜치를 만든 뒤 수정을 시작하세요.
 
-### 브랜치 정리 시 안전 규칙
+#### 브랜치 정리 시 안전 규칙
 
 브랜치 삭제, `git clean` 등 정리 작업 전에 반드시 확인하세요:
 
@@ -16,11 +24,13 @@
 4. `--force` 옵션(`git branch -D` 등) 사용 금지 — 사용자가 명시적으로 요청한 경우에만
 5. PR이 머지되었더라도 워킹 디렉토리에 새 작업이 시작되었을 수 있으므로 **PR 상태만으로 판단하지 않는다**
 
-## 커밋 규칙
+### 커밋 규칙
 
-**스킬 우선 사용:** 커밋은 `/commit`, PR은 `/pull-request` 스킬을 사용하세요. git 명령어를 직접 실행하지 마세요.
+커밋/PR 스킬 라우팅 규칙은 `.claude/rules/skill-routing.md`를 따른다.
 
-## 최신 상태 유지
+tdd verify 게이트 미통과 상태의 `git commit`은 PreToolUse 훅(`pre-tool-guard.sh` G3)이 감지하여 사용자 확인(ask)을 요구한다 — 라우팅·스킬 층과 무관하게 항상 동작하는 최종 방어선이다.
+
+### 최신 상태 유지
 
 **매 요청 시작 전** 아래를 순서대로 실행하세요:
 
@@ -30,3 +40,23 @@
    - PR이 merged 상태일 때만 `git checkout main && git pull` 로 복귀
    - PR이 open이거나 PR이 없으면 **브랜치를 유지** — 임의로 main으로 돌아가지 마세요
 3. **main 브랜치에 있다면**: uncommitted 변경이 없으면 `git pull --rebase --autostash` 실행
+
+**예외 — ralph 반복 세션**: `.dev/{branch-slug}/state.md`가 `pipeline: ralph`이고 같은 디렉토리에 `ralph.lock`이 존재하는 세션(외부 러너가 기동한 헤드리스 반복)에서는 위 절차를 **적용하지 않는다**. 루프 중간의 브랜치 복귀·pull·rebase는 반복 간 상태 정합을 깨뜨린다. 반복 세션은 러너가 준비한 브랜치 그대로 작업한다.
+
+---
+
+## SVN 워크플로우 (vcs: "svn")
+
+### 브랜치 규칙
+
+SVN은 브랜치 없이 trunk에서 직접 작업한다. 별도 브랜치 생성/관리가 불필요하다.
+
+### 커밋 규칙
+
+SVN에서는 `/commit`, `/pull-request` 스킬을 지원하지 않는다. 사용자가 터미널에서 `svn commit`을 직접 실행하도록 안내한다 (PreToolUse 훅이 Claude의 `svn commit` 실행을 차단하므로 대신 실행하지 않는다).
+
+단, tdd 파이프라인 진행 중이면(`.dev/.active`가 가리키는 `.dev/{slug}/state.md` — 포인터 부재 시 `.dev/trunk/state.md` — 가 `pipeline: tdd`·`status: in_progress`이고 `verify-status`가 `passed`가 아님) `svn commit` 전에 verify 게이트(`ttuk-ttak:verify`) 통과를 먼저 확인한다 — SVN은 스킬 층 재확인 게이트가 없어 이 확인이 핵심 방어다. (PreToolUse 훅이 Claude의 `svn commit` 시도를 차단하고 verify 미통과 시 경고를 덧붙이지만, 사용자가 터미널에서 직접 실행하는 커밋에는 개입하지 못한다.)
+
+### 최신 상태 유지
+
+**매 요청 시작 전** `svn update`를 실행하여 최신 상태를 동기화하세요.

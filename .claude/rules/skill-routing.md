@@ -6,23 +6,77 @@
 
 | 사용자 표현 | 호출 스킬 |
 |------------|----------|
-| `커밋`, `커밋해`, `커밋해줘`, `commit` | `/ttutak:commit` |
-| `PR`, `PR 올려`, `PR 생성`, `풀리퀘`, `pull request` | `/ttutak:pull-request` |
-| `개발해줘`, `구현해줘`, `만들어줘`, `기능 추가`, `버그 수정`, `핫픽스` | `/ttutak:dev` |
-| `컨텍스트`, `도메인 등록`, `도메인 생성`, `context`, `용어 등록` | `/ttutak:context` |
-| `정책 확인`, `영향도`, `현행 분석`, `코드에서 찾아`, `lens` | `/ttutak:lens` |
-| `테스트`, `테스트 작성`, `테스트 추가`, `test`, `테스트해줘` | `/ttutak:test` |
-| `기술 부채`, `부채 분석`, `코드 건강`, `tech-debt`, `부채 확인` | `/ttutak:tech-debt` |
-| `교차 리뷰`, `교차 검증`, `크로스 리뷰`, `cross review` | `/ttutak:cross-review` |
+| `커밋`, `커밋해`, `커밋해줘`, `commit` | `/commit` |
+| `PR`, `PR 올려`, `PR 생성`, `풀리퀘`, `pull request` | `/pull-request` |
+| `도메인 테스트 보강`, `Spring 테스트 작성`, `테스트 커버리지` | `/test` (기존 Spring 도메인 테스트) |
+| `교차 리뷰`, `교차 검증`, `cross review`, `크로스 리뷰` | `/cross-review` |
+
+**tdd·ralph 파이프라인 진행 중 커밋/PR 의도 (verify 우회 방지):**
+- 이 분기는 **사용자의 자연어 발화에만** 적용한다. 파이프라인 내부(phase-complete Step 1/2)의 Skill 호출에는 적용하지 않는다.
+- 판별: 저장소 루트 기준 `.dev/{branch-slug}/state.md`(branch-slug = 브랜치명의 `/`를 `-`로 치환. **svn은 `.dev/.active`가 가리키는 `.dev/{slug}/state.md` — 포인터 부재·공백 시 `.dev/trunk/state.md` 폴백**)가 존재하고 `pipeline: tdd` 또는 `pipeline: ralph`이며 `status: in_progress`이고 **(a) `verify-status`가 `passed`가 아니거나 (b) `verify-fingerprint`가 기록되어 있는데 현재 코드 지문과 트리 성분이 다르면**(=verify 통과 후 코드가 바뀜 — HEAD 성분은 참고용이며, 검증된 코드가 그대로 커밋되어 HEAD만 전진한 경우는 일치로 간주한다) — 단일 스킬이든 체이닝(`커밋하고 PR`)이든 커밋/PR로 직행시키지 않는다. 지문 규약은 commit의 verify 경고 게이트 항목을 따르며, 지문 필드가 없는 구 세션은 (a)만 판정한다.
+- **svn 프로젝트**는 commit이 미지원(VCS 가드 종료)이라 스킬 층의 재확인 게이트가 없다 — PreToolUse 훅이 Claude의 `svn commit` 시도를 차단(verify 미통과 시 경고 포함)하지만 사용자의 터미널 커밋에는 개입하지 못하므로, 이 라우팅 분기가 사용자 안내의 핵심 방어다. `svn commit` 직접 실행 안내 전에 반드시 이 판별을 수행한다.
+- **git 프로젝트**는 commit 스킬이 보호 브랜치·verify 미통과를 선행 판별한다. 신뢰된 PreToolUse 훅(`pre-tool-guard.sh` G3)은 직접 `git commit` 시도도 검사한다. Claude Code는 기존 `ask` 분기를 유지하고, Codex 어댑터는 미지원 `ask`를 `deny`로 정규화한다. 훅 미신뢰·미로드 상태를 보호 성공으로 보고하지 않는다.
+- 대신 안내한다: "verify 게이트 미통과 상태입니다. `ttuk-ttak:verify`로 검증을 통과시킨 뒤 커밋/PR을 진행하거나, 전체 완료 절차(인수 검증 포함)는 `/tdd --phase complete`를 사용하세요." 판별된 파이프라인이 `ralph`(lock 없음 = 루프 중단 잔여 상태)이면 대신 안내한다: "ralph 루프의 잔여 상태입니다. 러너 재실행으로 루프를 재개하거나, `ttuk-ttak:verify` 통과 후 커밋/PR을 진행하세요." Codex에서는 verify 미통과 상태를 사용자 위험 수용만으로 우회하지 않는다. Claude Code의 기존 위험 수용 분기는 해당 하네스의 스킬·훅 절차에 따른다.
+- `pipeline` 필드가 tdd/ralph가 아닌 state.md(dev 등)에는 적용하지 않는다.
+
+**ralph 루프 예외:**
+- `ttuk-ttak:ralph-iterate`(헤드리스 반복 세션)의 직접 `git commit`은 commit 라우팅 강제의 **명시적 예외**다 — 헤드리스에는 commit의 확인 게이트(AskUserQuestion)에 응답할 사용자가 없다. 커밋 메시지 컨벤션(`{type}: 메시지`, 트레일러 금지)은 동일하게 준수하며, verify 게이트는 훅 G3(`pipeline: ralph` 인식)가 유지한다.
+- 사용자가 루프 실행 중(`.dev/{branch-slug}/ralph.lock` 존재) 커밋/PR을 요청하면: 러너가 실행 중임을 안내하고, 루프 종료(또는 lock 해제 확인) 후 진행하도록 권한다.
+
+## 개발 파이프라인 분기 (dev vs tdd)
+
+| 사용자 표현 | 호출 스킬 |
+|------------|----------|
+| `개발해줘`, `구현해줘`, `만들어줘`, `기능 추가` | `/dev` (일반 개발) |
+| `TDD로`, `TDD로 개발`, `테스트 먼저`, `테스트 주도`, `RED-GREEN-REFACTOR`, `RGR` | `/tdd` (TDD 강제) |
+| `랄프로 … 개발해줘`, `ralph로 …`, `무인 루프로 …` (개발 요청에 붙는 전환 발화) | `/dev --ralph …` (TDD 키워드가 함께 있으면 `/tdd --ralph …`) — ralph 직접 호출이 아니다 |
+
+### 작업 계획 참조 (`.dev/plan.md`가 있을 때)
+
+| 사용자 표현 | 처리 |
+|------------|------|
+| `W01 시작해줘`, `phase W01 개발해줘`, `W01 진행` | 계획의 W01 행으로 파이프라인 진입 (`/dev` 또는 `/tdd` — TDD 키워드 유무로 분기) |
+| `지금 뭐 할 수 있어?`, `병렬 가능한 작업` | 계획을 읽어 의존이 풀린 작업을 계산해 제시 (파이프라인 진입 없음) |
+
+- 작업 ID는 `W` + 두 자리 숫자다. **`.dev/plan.md`에 같은 ID의 행이 실제로 있을 때만** 작업 참조로 해석한다 — 계획이 없거나 행이 없으면 그냥 요청 문구의 일부로 둔다.
+- 도메인·요구사항 범위는 계획 행에서 읽으므로 사용자가 말할 필요가 없다.
+- 명시적으로 지정하려면 `--work W01` 플래그를 쓴다. 자연어와 동일하게 처리된다.
+
+**분기 규칙:**
+- 명시적 TDD 키워드(`TDD`, `테스트 먼저`, `테스트 주도`, `RED-GREEN-REFACTOR` 등)가 있으면 `/tdd`를 호출한다.
+- TDD 키워드가 없는 일반 개발 요청은 `/dev`를 호출한다.
+- `랄프로`/`ralph로`/`무인 루프로`가 개발 요청에 붙으면 ralph를 직접 호출하지 않고 해당 파이프라인에 `--ralph`를 붙여 호출한다 — ralph 직접 호출은 PRD 부재 게이트에 막히고, 안내대로 재실행하면 opt-in이 증발한다. 단독 발화(`랄프 준비해줘`, `랄프 상태`, `루프 돌려`)만 `/ralph` 직접 호출이다.
+- 두 스킬은 commit/pull-request 공유 스킬을 동일하게 Skill 호출로 사용하고, setup phase 구조와 `context/` 참조 방식도 같다 (단, phase-setup은 각자 별도 파일이며 context는 파이프라인이 호출하지 않는 독립 스킬이다). 차이는 구현(RGR 격리)·리뷰(spec+quality 통합 1석)·verify 게이트뿐이다.
+- 애매하면 사용자에게 어느 방식으로 진행할지 확인한다.
+
+### TDD 보조 스킬 (단독 호출)
+
+아래 스킬은 명시적 키워드로 단독 호출할 수 있다. `red`/`green`/`refactor`는 tdd 파이프라인이 직접 호출하지 않고 `red-writer`를 디스패치하고 IMPLEMENT는 오케스트레이터가 직접 수행하므로(`--isolated`면 `implementer` 디스패치. green-coder/refactor-coder는 단독 스킬 전용) 단독·체이닝 전용이며, `verify`만 phase-complete가 Skill로 호출한다:
+
+| 사용자 표현 | 호출 스킬 |
+|------------|----------|
+| `RED 단계`, `실패 테스트 먼저`, `실패 테스트 작성` | `/red` |
+| `GREEN 단계`, `테스트 통과시켜`, `최소 구현` | `/green` |
+| `리팩터 단계`, `REFACTOR 단계`, `중복 제거 정리` | `/refactor` |
+| `완료 검증`, `verify 게이트`, `테스트 실행 증거` | `/verify` |
 
 ## 순차 스킬 체이닝
 
 | 사용자 표현 | 실행 순서 |
 |------------|----------|
-| `커밋하고 PR`, `커밋 후 PR`, `커밋해주고 PR 올려`, `커밋하고 풀리퀘` | `/ttutak:commit` 완료 후 → `/ttutak:pull-request` 실행 |
-| `개발하고 PR`, `구현하고 PR`, `만들고 PR 올려` | `/ttutak:dev` (dev가 내부적으로 commit/PR까지 처리) |
+| `커밋하고 PR`, `커밋 후 PR`, `커밋해주고 PR 올려`, `커밋하고 풀리퀘` | `/commit` 완료 후 → `/pull-request` 실행 |
 
 **체이닝 규칙:**
 - 첫 번째 스킬이 **성공적으로 완료**된 후에만 두 번째 스킬을 실행한다.
 - 첫 번째 스킬이 실패하면 두 번째 스킬을 실행하지 않고 사용자에게 보고한다.
 - 각 스킬은 독립적으로 호출한다 (Skill 도구 사용). git 명령어로 대체하지 않는다.
+
+## 내부 파이프라인에서도 동일 적용
+
+`/dev`, `/tdd` 등 파이프라인 스킬 내부에서 커밋/PR을 수행할 때도 위 규칙이 동일하게 적용된다.
+파이프라인이 길어져 컨텍스트가 압축되더라도, 아래 명령어를 오케스트레이터가 직접 실행하지 않는다:
+
+- **금지**: `git commit`, `gh pr create`, `git push` 직접 실행
+- **필수**: `Skill(skill: "ttuk-ttak:commit")`, `Skill(skill: "ttuk-ttak:pull-request")` 호출
+- **실패 시**: 직접 명령어로 우회하지 않고 사용자에게 보고한다.
+- **예외**: dev phase-complete의 "context 변경사항 자동 커밋"(Step 3~4)은 status.md 동기화를 전용 메시지 형식(`docs: [context] …`)으로 직접 `git add/commit/push`한다 — 기능 코드가 아닌 context 문서 동기화 전용이며 별도 push 정책을 따른다. ralph-iterate의 헤드리스 직접 커밋과 함께 이 규칙의 명시적 예외다. phase-setup 3.0.5의 착수 기록 커밋과 phase-complete Step 3.5의 완료 갱신 커밋(둘 다 `docs: [plan] …`)도 같은 예외다 — `.dev/plan.md` 한 파일만 스테이징하며 기능 코드를 포함하지 않는다.

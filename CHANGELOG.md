@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.0.0 (2026-10-11) — Ttuk Ttak 이름 변경 + upstream v1.33.0 통합
+
+### Changed
+- 표시 이름을 **Ttuk Ttak · 뚝딱**, 플러그인·마켓플레이스·명령 네임스페이스를 `ttuk-ttak`으로 변경. 저장소는 `rnqhstmd/ttutak` 유지.
+- [oh-my-gx v1.33.0](https://github.com/bs-koo/oh-my-gx/releases/tag/v1.33.0), 커밋 `e807c65` 기준으로 스킬·에이전트·하네스·훅·회귀 검사를 통합.
+- TDD, RED/GREEN/REFACTOR, verify, Ralph와 Codex 역할·설정·훅 어댑터를 제공.
+- 기존 `test` 스킬, Slack 알림, 민감 파일 오탐 방지, 릴리스 버전 일치 검사를 보존.
+- 설치·사용 문서와 홈페이지를 새 브랜드로 갱신. 기존 설치는 구형 플러그인을 제거한 후 이전.
+
+### Validation
+- 현재 버전의 검증 범위는 [이식 보고서](docs/migration-2.0.0.md)에 기록. upstream 과거 보고서는 원본 출처를 보존하며 이 버전의 검증으로 간주하지 않음.
+
+---
+
 ## v1.4.0 (2026-05-14) — grill-me 순차 QA + Phase 0 공식 API 8종 + Jina Reader 재시도
 
 ### Features

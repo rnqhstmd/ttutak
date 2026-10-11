@@ -3,7 +3,7 @@
 Explore Phase의 탐색 결과를 종합하여 최종 보고서를 생성한다. 오케스트레이터가 직접 수행한다.
 
 **선행 로드**: Report Phase 진입 시 아래를 Read한다.
-- `Read(<프로젝트 루트>/.claude/skills/lens/references/report-guide.md)`
+- `Read(../references/report-guide.md)`
 
 이후 각 절에서 별도 Read 없이 메모리의 내용을 사용한다.
 
@@ -20,9 +20,26 @@ Explore Phase에서 "유사 기능"으로 분류된 항목이 있으면, 보고�
 보고서에 포함할 항목을 선택해주세요. (복수 선택 가능, 스킵하려면 "없음" 선택)
 ```
 
-AskUserQuestion으로 multiSelect 선택지를 제시한다.
+다음과 같이 선택지를 제시한다 (`multiSelect: true`):
+
+```
+AskUserQuestion(
+  questions: [{
+    header: "유사 기능 포함",
+    question: "보고서에 포함할 유사 기능을 선택해주세요.",
+    multiSelect: true,
+    options: [
+      { label: "<유사 기능 1>", description: "<무엇이 유사한지>" },
+      { label: "<유사 기능 2>", description: "<무엇이 유사한지>" },
+      { label: "없음", description: "유사 기능을 포함하지 않습니다" }
+    ]
+  }]
+)
+```
+
 - 사용자가 선택한 항목은 "발견된 구현"에 합류시킨다.
 - 선택하지 않은 항목은 제외한다.
+- "없음"을 선택하면 합류시키지 않는다.
 - 유사 기능이 0건이면 이 단계를 건너뛴다.
 
 ## 2. 전체 미발견 체크
@@ -38,7 +55,7 @@ AskUserQuestion으로 multiSelect 선택지를 제시한다.
 - 코드에서 다른 용어를 사용하고 있을 수 있습니다.
 
 다음을 시도해보세요:
-- 다른 표현으로 쿼리: `/ttutak:lens <다른 키워드>`
+- 다른 표현으로 쿼리: `/lens <다른 키워드>`
 ```
 Report Phase 완료. 아래 단계를 건너뛴다.
 
@@ -73,11 +90,11 @@ Report Phase 완료. 아래 단계를 건너뛴다.
 
 Explore Phase의 발견 사항을 **"대상에게 무슨 일이 일어나는가"** 관점으로 재합성한다. **3절에서 분류한 관련도에 따라 비중을 조절**한다.
 
-템플릿 선택, 소그룹화 규칙, 합성 규칙의 상세는 `references/report-guide.md`를 참조한다 (Report Phase 진입 시 이미 Read 완료).
+템플릿 선택, 소그룹화 규칙, 합성 규칙의 상세는 `lens/references/report-guide.md`를 참조한다 (Report Phase 진입 시 이미 Read 완료).
 
 ## 5. 보고서 작성
 
-보고서 공통 구조, 마크다운 활용 원칙, 모드별 작성 원칙의 상세는 `references/report-guide.md`를 참조한다 (Report Phase 진입 시 이미 Read 완료).
+보고서 공통 구조, 마크다운 활용 원칙, 모드별 작성 원칙의 상세는 `lens/references/report-guide.md`를 참조한다 (Report Phase 진입 시 이미 Read 완료).
 
 ## 6. 보고서 출력
 
@@ -89,28 +106,36 @@ Explore Phase의 발견 사항을 **"대상에게 무슨 일이 일어나는가"
 
 Prepare Phase 0절에서 파싱한 `IDEA_RAW`가 존재하면:
 - `IDEA_CONTEXT = { idea: IDEA_RAW, clarifications: null }`
-- `Read(<프로젝트 루트>/.claude/skills/lens/phases/phase-impact.md)` 후 Impact Phase로 진행한다.
+- `Read(phase-impact.md)` 후 Impact Phase로 진행한다.
 
 ### 아이디어 질문
 
 `IDEA_RAW`가 없으면 AskUserQuestion **1회**로 질문한다:
 
 ```
-변경하려는 아이디어가 있으면 알려주세요. 영향도를 분석합니다.
+AskUserQuestion(
+  questions: [{
+    header: "영향도 분석",
+    question: "변경하려는 아이디어가 있으면 알려주세요. 영향도를 분석합니다.",
+    multiSelect: false,
+    options: [
+      { label: "Other로 입력", description: "Other로 이동해서 변경하려는 아이디어를 자연어로 입력해주세요" },
+      { label: "분석 없이 마치기", description: "영향도 분석을 건너뜁니다" }
+    ]
+  }]
+)
 ```
 
-- 선택지:
-  - "분석 없이 마치겠습니다"
-- 사용자가 "Other"로 아이디어를 직접 입력하면 → 아이디어를 입력받은 것으로 처리한다.
+- 사용자가 Other로 내용을 입력하면 → 아이디어를 입력받은 것으로 처리한다.
 
 - **아이디어를 입력받으면**:
   - `IDEA_CONTEXT = { idea: <입력된 아이디어>, clarifications: null }`
   - IDEA가 불명확하면 **1회만** 보강 질문 (대상 범위/변경 규모/제약 조건, 최대 3개). 답변을 `clarifications`에 저장.
-  - `Read(<프로젝트 루트>/.claude/skills/lens/phases/phase-impact.md)` 후 Impact Phase로 진행한다.
+  - `Read(phase-impact.md)` 후 Impact Phase로 진행한다.
 
-- **"분석 없이 마치겠습니다"를 선택하면**:
+- **"분석 없이 마치기"를 선택하면**:
   ```
-  추가로 확인하고 싶은 정책이 있으면 `/ttutak:lens <쿼리>`로 다시 실행해주세요.
+  추가로 확인하고 싶은 정책이 있으면 `/lens <쿼리>`로 다시 실행해주세요.
   ```
   요약 모드일 때 추가:
   ```

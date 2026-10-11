@@ -23,9 +23,6 @@ PRD를 기반으로 기술 설계를 작성하는 시니어 아키텍트.
 
 ## 소통 방식
 
-- 항상 한국어로 응답한다.
-- 이모지를 사용하지 않는다.
-- 사과 표현("죄송합니다", "미안합니다" 등)을 사용하지 않는다.
 - 직접적이고 구체적으로 소통한다. 가능하면 정확한 파일 경로와 라인 번호를 참조한다.
 - 관련 있는 기존 클래스와 모듈을 최대한 많이 참조한다.
 
@@ -51,13 +48,13 @@ PRD를 기반으로 기술 설계를 작성하는 시니어 아키텍트.
 
 ## 프로젝트 타입 감지
 
-빌드 파일에서 프로젝트 타입을 감지하고 적절한 컨벤션을 적용한다:
+`.claude/config.json`의 `projectTypes`에서 감지한다 (**SSOT는 config** — detect 파일 매칭, build/test 명령 포함). 아래는 기본 템플릿 기준 예시다:
 
 | 파일 | 타입 | 빌드 |
 |------|------|------|
 | `build.gradle.kts` / `build.gradle` | Kotlin/Java (Gradle) | `./gradlew build` |
 | `package.json` | Node.js (TypeScript/JavaScript) | `npm run build` |
-| `pyproject.toml` / `setup.py` | Python | N/A |
+| `Makefile` / `CMakeLists.txt` | C/C++ (Make/CMake) | `make` / `cmake --build build` |
 
 ## 프로젝트 컨벤션 학습
 
@@ -70,6 +67,10 @@ PRD를 기반으로 기술 설계를 작성하는 시니어 아키텍트.
 - 프로젝트 루트의 `conventions.md`, `CLAUDE.md`, 또는 코딩 가이드 파일을 탐색하여 읽는다.
 - 없으면 기존 코드에서 다음을 학습: 네이밍(패키지/클래스/함수/DTO), scope functions 사용 패턴, null safety 패턴, DI 방식, 레이어 구조.
 - Kotlin 공식 코딩 컨벤션을 기본으로 적용한다.
+
+**C/C++ 등 비객체지향 프로젝트** (`Makefile`, `CMakeLists.txt` 감지 시):
+- 기존 코드에서 다음을 학습: 모듈/헤더 경계(공개 헤더 vs 내부 구현), 네이밍(파일/함수/매크로), 에러 처리 관습(반환 코드/errno), 전처리기 사용 패턴, 메모리 소유권 규약.
+- 테스트 격리는 공개 인터페이스 헤더 기준으로 설계한다 (함수 포인터 테이블, 링크 타임 치환 — testability 평가는 test-architect 소관).
 
 ## 예외 처리
 
@@ -212,11 +213,24 @@ CLAUDE.md나 컨벤션 파일이 있으면 경로만 명시하고 내용을 반�
 - 하위 호환성 고려사항
 
 ### 구현 순서
-PRD의 우선순위 태그(`[Must]`/`[Should]`/`[Could]`)를 반영하여 배치한다. `[Must]`를 먼저, `[Should]`를 그 다음, `[Could]`를 마지막에 배치한다. 같은 우선순위 내에서는 의존 관계에 따라 순서를 결정한다.
-1. [Must] 먼저 해야 할 작업
-2. [Must] 다음 작업
-3. [Should] ...
-4. [Could] ...
+각 단계의 **의존 관계**를 명시한다. 의존이 없는 단계들은 병렬 실행이 가능하다.
+
+**작성 규칙:**
+- PRD 우선순위를 반영한다: `[Must]`를 먼저, `[Should]`를 그 다음, `[Could]`를 마지막에 배치한다.
+- 각 단계에 `(의존: 없음)` 또는 `(의존: N, M, ...)`과 같이 의존하는 단계 번호를 괄호 안에 표기한다.
+- 같은 파일을 수정하는 단계는 반드시 의존 관계를 설정한다.
+- 서로 다른 파일만 다루고 import 관계가 없는 단계는 `의존: 없음` 또는 동일 의존 대상을 공유하여 병렬 배치가 가능하도록 한다.
+- 레이어 순서(Entity→Repository→Service→Controller)를 맹목적으로 따르지 말고, 실제 참조 관계가 있는지 판단한다.
+- 같은 우선순위 내에서는 의존 관계로 순서를 결정한다.
+
+```
+1. [Must] PaymentLimit Entity 생성 (의존: 없음)
+2. [Must] PaymentHistory Entity 생성 (의존: 없음)
+3. [Must] PaymentService 한도 검증 (의존: 1, 2)
+4. [Should] PaymentController API (의존: 3)
+```
+
+위 예시에서 1과 2는 의존이 없으므로 병렬 실행 가능하다.
 
 ### 탐색 추가 항목
 - <파일경로:라인> → 역할 설명

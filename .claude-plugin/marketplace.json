@@ -1,17 +1,17 @@
 {
-  "name": "ttutak",
+  "name": "ttuk-ttak",
   "owner": {
     "name": "rnqhstmd"
   },
   "metadata": {
-    "description": "개발 자동화 플러그인"
+    "description": "Ttuk Ttak 개발 자동화 플러그인"
   },
   "plugins": [
     {
-      "name": "ttutak",
+      "name": "ttuk-ttak",
       "source": "./",
-      "description": "개발 자동화 플러그인. PRD, 설계, 구현, 리뷰, PR까지 에이전트 팀이 처리합니다.",
-      "version": "1.4.0"
+      "description": "Ttuk Ttak 개발 자동화 플러그인. PRD, 설계, 구현, 리뷰, PR까지 에이전트 팀이 처리합니다.",
+      "version": "2.0.0"
     }
   ]
 }

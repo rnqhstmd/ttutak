@@ -5,7 +5,7 @@
 
 | 용어 | 설명 |
 |------|------|
-| ttutak | AI 기반 개발 자동화 플러그인 |
+| Ttuk Ttak | AI 기반 개발 자동화 플러그인. 플러그인 식별자는 `ttuk-ttak` (이전 이름: ttutak) |
 | GH | GitHub (github.com) |
 | PRD | Product Requirements Document. 제품 요구사항 문서 |
 | context/ | 도메인별 아키텍처·용어·구현 상태를 정리하는 디렉토리 |

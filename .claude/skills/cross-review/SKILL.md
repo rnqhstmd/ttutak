@@ -1,7 +1,6 @@
 ---
 name: cross-review
-version: 1.0.0
-description: dev 산출물(PRD/설계서/Trust Ledger)을 컨텍스트로 주입한 교차 검증 리뷰를 수행한다. "교차 리뷰", "교차 검증", "cross review", "크로스 리뷰" 시 사용. /ttutak:dev 완료 후 단발 호출 전용.
+description: dev 산출물(PRD/설계서/Trust Ledger)을 컨텍스트로 주입한 교차 검증 리뷰를 수행한다. "교차 리뷰", "교차 검증", "cross review", "크로스 리뷰" 시 사용. /dev 또는 /tdd 완료 후 단발 호출 전용.
 argument-hint: ""
 allowed-tools:
   # VCS
@@ -29,15 +28,24 @@ allowed-tools:
   - Glob
   - Grep
   - Task
-  - Skill
   - AskUserQuestion
 ---
 
 # cross-review
 
-`/ttutak:dev` 파이프라인이 만들어낸 dev 산출물(PRD, 설계서, Trust Ledger, 자기점검, 코드 맵)을 컨텍스트로 주입한 교차 검증 리뷰를 수행한다. 일반 `/codex:review`와 달리 **"코드 품질"이 아닌 "산출물 약속 대비 충실도"**를 검증한다.
+`/dev` 파이프라인이 만들어낸 dev 산출물(PRD, 설계서, Trust Ledger, 자기점검, 코드 맵)을 컨텍스트로 주입한 교차 검증 리뷰를 수행한다. 일반 `/codex:review`와 달리 **"코드 품질"이 아닌 "산출물 약속 대비 충실도"**를 검증한다.
 
 항상 한국어로 응답한다.
+
+**하네스 적응**: 이 문서는 Claude Code 도구명으로 서술한다. 다른 하네스에서 실행 중이면 아래 대응으로 옮겨 수행한다.
+
+Codex에서는 먼저 `Read("../dev/references/codex-runtime.md")`로 공통 실행 규약을 읽고, 이 스킬의 절차·게이트를 유지한다. 상대경로는 이 SKILL.md 위치 기준이다.
+Codex on Windows: read this SKILL.md and referenced files as UTF-8; use `Get-Content -Encoding UTF8`.
+
+- `AskUserQuestion` → `request_user_input`. 그 도구를 쓸 수 없으면 자연어로 묻되, **승인 없이 다음 단계로 넘어가지 않는다**는 계약은 그대로 지킨다.
+- `Task(subagent_type="ttuk-ttak:{name}")` → 공통 실행 규약의 `codex-roles/index.json`과 역할 본문·도구 제약을 읽어 `spawn_agent`의 message에 태스크 prompt 전문과 함께 전달한다. 격리 시 `fork_turns: "none"`을 쓴다.
+
+도구 이름이 다르다는 이유로 게이트를 건너뛰지 않는다. 확인·검증 단계는 하네스와 무관하게 유지한다.
 
 ## 정체성
 
@@ -47,7 +55,8 @@ allowed-tools:
 | advisor | 차별점 |
 |---------|--------|
 | `codex` | 산출물 기반 검증 미션 + 다른 모델 관점 (이중 차별) |
-| `claude` | 산출물 기반 검증 미션 + 별도 페르소나/contract (단일 차별) |
+| `native` | 현재 하네스의 내부 역할 에이전트로 산출물 기반 검증 |
+| `claude` | Claude Code 호스트에서 기존 역할 리뷰 (Codex 호스트에서는 미지원) |
 
 기본 `/codex:review`와의 비교:
 
@@ -56,33 +65,34 @@ allowed-tools:
 | 입력 | git diff | diff + PRD + 설계 + Trust Ledger + references |
 | 검증 미션 | 일반 코드 품질 | AC 충족 + 설계 범위 이탈 + 신규 위험만 |
 | 중복 제거 | 없음 | trust-ledger·self-check 기반 차단 |
-| 출력 정규화 | codex 자체 포맷 | ttutak Trust Ledger 호환 |
+| 출력 정규화 | codex 자체 포맷 | ttuk-ttak Trust Ledger 호환 |
 | 한국어 | 영어 기본 | 한국어 강제 |
 
 ## 인자
 
 `ARGS[0]`은 비워두는 것이 기본이다. 옵션 플래그만 지원한다:
 
-- `--advisor codex|claude`: advisor 자동 선택 (생략 시 사용자에게 묻는다).
+- `--advisor codex|native|claude`: advisor 선택 (생략 시 사용자에게 묻는다).
 - `--dev-dir <path>`: 산출물 디렉토리 직접 지정 (생략 시 현재 브랜치 기준 자동 추론).
 - `--base <branch>`: 베이스 브랜치 직접 지정 (생략 시 자동 감지).
 - `--scope diff|stat`: diff 수집 모드 (기본: diff. 변경이 큰 경우 stat).
 
 ## 사용 시점
 
-- **권장**: `/ttutak:dev` 완료 후 단발 호출. PR 생성 직전 추가 검증으로 사용.
-- **비권장**: `/ttutak:dev` 파이프라인 도중 호출. 자기점검·phase-review와 중복된다.
+- **권장**: `/dev` 완료 후 단발 호출. PR 생성 직전 추가 검증으로 사용.
+- **비권장**: `/dev` 파이프라인 도중 호출. 자기점검·phase-review와 중복된다.
 
 ## 공유 변수
 
-다른 스킬과 동일한 명명 규칙을 따른다 (`ttutak:dev` 스킬의 공유 규칙과 정렬):
+다른 스킬과 동일한 명명 규칙을 따른다 (dev "공유 규칙" 참조):
 
 - `BRANCH`: `git branch --show-current` 결과.
+- `PROJECT_ROOT`: `git rev-parse --show-toplevel`로 확인한 소비 프로젝트의 절대경로.
 - `BRANCH_SLUG`: `${BRANCH}`에서 `/`를 `-`로 치환한 값.
 - `DEV_DIR`: 기본값 `.dev/${BRANCH_SLUG}`. `--dev-dir`로 오버라이드 가능.
 - `BASE_BRANCH`: 자동 감지 또는 `--base`로 지정.
-- `ADVISOR`: `codex` 또는 `claude`. Step 1에서 결정.
-- `CODEX_COMPANION`: codex companion 스크립트 절대 경로. Step 3a에서 동적 탐색.
+- `ADVISOR`: `codex`, `native`, `claude`. Step 1에서 결정.
+- `GX_PLUGIN_ROOT`: 설치된 Ttuk Ttak 플러그인 루트의 확인된 절대경로. `scripts/codex-run.py` 확인에 사용.
 - `DIFF_FILE`: `${DEV_DIR}/diff.txt`. Step 2-2에서 갱신.
 - `ARTIFACTS`: 로드된 산출물 목록 (prd/design/trust-ledger/self-check/codemap/references).
 - `RESULT_FILE`: `${DEV_DIR}/cross-review.md`. Step 4 산출물.
@@ -104,7 +114,7 @@ allowed-tools:
 
 | 옵션 | 형식 | 저장 변수 | 허용 값 |
 |------|------|----------|---------|
-| `--advisor` | `--advisor codex` 또는 `--advisor=codex` | `${ADVISOR}` | `codex`, `claude` |
+| `--advisor` | `--advisor codex` 또는 `--advisor=codex` | `${ADVISOR}` | `codex`, `native`, `claude` |
 | `--dev-dir` | `--dev-dir <path>` 또는 `--dev-dir=<path>` | `${DEV_DIR}` | 디렉토리 경로 |
 | `--base` | `--base main` 또는 `--base=main` | `${BASE_BRANCH}` | 브랜치명 |
 | `--scope` | `--scope diff` 또는 `--scope=stat` | `${SCOPE}` | `diff`(기본), `stat` |
@@ -116,29 +126,34 @@ allowed-tools:
 
 ### 0-1. 브랜치/디렉토리 결정
 
-1. `git branch --show-current` → `${BRANCH}`. 빈 문자열(detached HEAD)이면 중단:
+1. `git rev-parse --show-toplevel`로 소비 프로젝트의 `${PROJECT_ROOT}` 절대경로를 확인한다. 실패하면 Git 프로젝트가 아니므로 중단한다. 이후 Git·helper 명령은 이 경로를 작업 위치로 쓴다.
+2. `git branch --show-current` → `${BRANCH}`. 빈 문자열(detached HEAD)이면 중단:
    ```
    "현재 detached HEAD 상태입니다. 브랜치 위에서 다시 호출해주세요."
    ```
-2. `${BRANCH_SLUG}` = `${BRANCH}`에서 `/` → `-`.
-3. `--dev-dir`이 지정되지 않았으면 `${DEV_DIR}` = `.dev/${BRANCH_SLUG}`.
-4. `mkdir -p ${DEV_DIR}` 실행 (없으면 생성).
+3. `${BRANCH_SLUG}` = `${BRANCH}`에서 `/` → `-`.
+4. `--dev-dir`이 지정되지 않았으면 `${DEV_DIR}` = `.dev/${BRANCH_SLUG}`.
+5. 상대 `${DEV_DIR}`은 `${PROJECT_ROOT}` 기준 절대경로로 정규화한다 (`--dev-dir`로 이미 절대경로가 주어졌으면 유지). `mkdir -p ${DEV_DIR}` 실행 (없으면 생성). 이후 `${PROMPT_FILE}`·`${RAW_FILE}`·events도 이 절대 `${DEV_DIR}` 아래에서 계산해 helper에 전달한다.
 
 ### 0-2. 베이스 브랜치 결정
 
 `--base`가 지정되지 않았으면 다음 우선순위로 결정한다:
 
-1. **state.md 우선**: `${DEV_DIR}/state.md`가 존재하면 Read하여 `base:` 필드를 추출하여 `${BASE_BRANCH}`로 사용한다. `/ttutak:dev`가 phase-setup에서 결정한 값과 동일하게 정렬된다 (재질문 없음).
-2. **자동 감지** (state.md 없거나 base 필드 없을 때, ttutak:dev "베이스 브랜치 감지" 규칙과 동일):
+1. **state.md 우선**: `${DEV_DIR}/state.md`가 존재하면 Read하여 `base:` 필드를 추출하여 `${BASE_BRANCH}`로 사용한다. `/dev`가 phase-setup에서 결정한 값과 동일하게 정렬된다 (재질문 없음).
+2. **자동 감지** (state.md 없거나 base 필드 없을 때, dev "베이스 브랜치 감지" 규칙과 동일):
    - `git branch --list main master develop`로 존재하는 브랜치 확인.
    - 2개 이상이면 AskUserQuestion으로 선택:
      ```
      AskUserQuestion(
-       question: "베이스 브랜치를 선택해주세요.",
-       options: [
-         { value: "main", label: "main", description: "기본 브랜치" },
-         { value: "develop", label: "develop", description: "개발 브랜치" }
-       ]
+       questions: [{
+         question: "베이스 브랜치를 선택해주세요.",
+         header: "베이스 브랜치",
+         options: [
+           { label: "main", description: "기본 브랜치" },
+           { label: "develop", description: "개발 브랜치" }
+         ],
+         multiSelect: false
+       }]
      )
      ```
    - 1개면 자동 선택.
@@ -151,16 +166,17 @@ allowed-tools:
 | 산출물 | 경로 | 검증 미션 |
 |--------|------|-----------|
 | prd | `${DEV_DIR}/prd.md` | "[Must] AC 모두 충족됐는가?" |
+| ac (core) | `${DEV_DIR}/ac.md` | "AC 모두 충족됐는가?" (핵심 모드의 AC 명세 — prd.md의 경량 대체물) |
 | design | `${DEV_DIR}/design.md` | "변경 범위 외 파일 수정이 있는가?" |
+| summary (core) | `${DEV_DIR}/summary.md` | "변경 요약·Gate 증거 대조" (핵심 모드) |
 | trust-ledger | `${DEV_DIR}/trust-ledger.md` | "이미 보고된 항목 제외, 신규 위험만" |
 | self-check | `${DEV_DIR}/self-check.md` | "자기점검 Warning/Info 중복 보고 금지" |
-| codemap | `${DEV_DIR}/codemap.md` | "탐색 부담 절감용 핵심 파일 목록" (선택 산출물) |
+| codemap | `${DEV_DIR}/codemap.md` | "탐색 부담 절감용 핵심 파일 목록" |
 
 **판정 규칙**:
-- prd, design 둘 다 없으면 → **fallback 모드** (Step 5의 산출물 부재 fallback 진입).
-- 둘 중 하나라도 있으면 → cross-review 본 모드 진행.
-- trust-ledger/self-check/codemap은 있으면 활용, 없어도 진행.
-- **codemap.md 부재는 정상**: ttutak `dev` 파이프라인은 codemap을 자동 생성하지 않는다. 부재 시 경고 없이 그대로 진행한다.
+- prd, ac, design 셋 다 없으면 → **fallback 모드** (아래 "산출물 부재 fallback" 섹션 진입).
+- 셋 중 하나라도 있으면 → cross-review 본 모드 진행. **AC 명세는 prd.md 우선, 없으면 ac.md(core)를 사용한다.**
+- summary/trust-ledger/self-check/codemap은 있으면 활용, 없어도 진행.
 
 또한 프로젝트 루트의 `references/` 디렉토리를 점검한다. 존재하면 `ARTIFACTS.references`에 파일 목록을 채운다.
 
@@ -180,7 +196,7 @@ allowed-tools:
   - references/ (2개 파일)
 ```
 
-산출물 둘 다 없으면:
+산출물(prd·ac·design)이 셋 다 없으면:
 ```
 ## cross-review 환경
 - 브랜치: feat/login (base: main)
@@ -196,15 +212,20 @@ allowed-tools:
 
 ```
 AskUserQuestion(
-  question: "어떤 advisor로 교차 검증을 수행할까요?",
-  options: [
-    { value: "codex", label: "codex (Recommended)", description: "다른 모델(GPT-5.4) 관점으로 교차 검증" },
-    { value: "claude", label: "claude", description: "ttutak의 qa-manager + security-auditor를 cross-review 미션으로 호출" }
-  ]
+  questions: [{
+    question: "어떤 advisor로 교차 검증을 수행할까요?",
+    header: "advisor 선택",
+    options: [
+      { label: "codex (Recommended)", description: "Codex CLI read-only 세션으로 교차 검증" },
+      { label: "native", description: "현재 하네스의 qa-manager + security-auditor 역할로 검증" },
+      { label: "claude", description: "Claude Code 호스트에서 기존 역할 리뷰 (Codex 호스트 미지원)" }
+    ],
+    multiSelect: false
+  }]
 )
 ```
 
-선택 결과의 `value`(`codex` 또는 `claude`)를 `${ADVISOR}`에 저장한다. label은 표시 전용이므로 분기에 사용하지 않는다.
+선택 결과를 `${ADVISOR}`에 저장한다.
 
 ### 1-1. codex 환경 사전 점검 (codex 선택 시)
 
@@ -229,25 +250,12 @@ AskUserQuestion(
    ```
    자동 설치/인증은 수행하지 않는다 — 사용자 환경 침해 방지.
 
-2. **companion 스크립트 탐색**:
-   ```bash
-   ls -t ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs 2>/dev/null | head -1
-   ```
-   결과를 `${CODEX_COMPANION}`에 저장. 빈 결과면:
-   ```
-   codex CLI는 있지만 codex 플러그인이 설치되지 않았습니다.
+2. **GX 네이티브 helper 확인**: 이 SKILL.md가 설치된 GX 루트의 절대경로를 `${GX_PLUGIN_ROOT}`로 확정하고 `scripts/codex-run.py` 존재를 확인한다. 없으면 "GX 배포가 불완전합니다: {경로}"를 보고하고 중단한다. 소비 프로젝트나 Claude plugin cache에서 companion을 찾지 않는다.
+3. **인증 상태**: helper 실행 시 Codex CLI가 검사한다. 설치/인증 문제가 나오면 오류를 보고하고 종료한다. 자동 설치/인증은 하지 않는다.
 
-   설치:
-     /plugin marketplace add openai/codex-plugin-cc
-     /plugin install codex@openai-codex
-     /reload-plugins
+Codex CLI가 설치·인증되어 있어도 **부모 Codex의 workspace-write 세션 안에서 다시 Codex CLI를 실행하면** `CODEX_HOME` 임시 파일이나 앱 서버 초기화에 필요한 쓰기/네트워크가 차단될 수 있다. 이 경우 오류를 그대로 보고하고, 현재 하네스의 역할 리뷰를 원하면 `--advisor native`로 별도 실행한다. 대화형 호스트에서는 필요한 CLI 권한을 기존 승인 절차로 처리한다. 인증 파일 복사, 권한 변경, 자동 우회 재시도는 하지 않는다. 헤드리스 부모가 승인할 수 없는 작업은 성공으로 취급하지 않는다.
 
-   설치 후 다시 호출해주세요.
-   ```
-
-3. **인증 상태**: companion이 자체적으로 인증을 검증하므로, 이 단계에서는 추가 점검을 하지 않는다.
-
-claude advisor를 선택했으면 1-1을 건너뛴다.
+`--advisor native`는 현재 하네스의 역할 에이전트 리뷰다. `--advisor claude`는 Claude Code 호스트에서만 기존 역할 리뷰를 수행한다. **Codex 호스트에서 claude를 선택하면 Claude 실행 경로 미지원으로 종료하고 native 또는 codex를 명시적으로 선택하도록 안내한다.** 이름만 자동으로 바꾸지 않는다. 둘 다 codex 환경 사전 점검은 건너뛴다.
 
 ---
 
@@ -261,8 +269,8 @@ advisor의 컨텍스트 한계를 고려하여 다음 우선순위로 산출물�
 
 | 순위 | 항목 | 추출 방법 | 비고 |
 |------|------|----------|------|
-| 1 | PRD "수용 기준" | `prd.md`에서 `### 수용 기준` 섹션만 추출 | 약속 대조용 |
-| 1 | 설계 "변경 범위" + "구현 순서" | `design.md`에서 해당 섹션 추출 | 범위 이탈 검증용 |
+| 1 | PRD "수용 기준" | `prd.md`에서 `### 수용 기준` 섹션만 추출. **prd.md가 없고 ac.md(core)가 있으면 ac.md의 `## 요구사항 (AC)` 섹션을 대신 추출** | 약속 대조용 |
+| 1 | 설계 "변경 범위" + "구현 순서" | `design.md`에서 해당 섹션 추출. **핵심 모드는 design.md 대신 summary.md의 "변경 파일" 표를 사용** | 범위 이탈 검증용 |
 | 1 | diff | Step 2-2에서 수집한 `${DIFF_FILE}` | 검증 대상 |
 | 2 | trust-ledger 항목 목록 | `trust-ledger.md` 전체 (보통 짧음) | 중복 차단용 |
 | 2 | self-check 발견 사항 | `self-check.md` 전체 | 중복 차단용 |
@@ -270,7 +278,7 @@ advisor의 컨텍스트 한계를 고려하여 다음 우선순위로 산출물�
 | 4 | references 목록 | `references/` 파일명 + 첫 200자 요약 (`head -c 200 ${file}` 또는 Read의 `limit: 5`) | 표준 위반 검증용 |
 
 **컨텍스트 폭발 방지**:
-- 각 산출물 추출 후 합산 토큰을 추정한다 (한국어 기준 1글자 ≈ 2.5토큰, 1줄(30자) ≈ 75토큰 가정. 영어 위주면 1줄 ≈ 8토큰).
+- 각 산출물 추출 후 합산 토큰을 추정한다 (한국어 기준 1줄 ≈ 30자 ≈ 30~40토큰 가정. 영어 위주면 1줄 ≈ 8토큰).
 - 합산이 60,000 토큰을 넘으면:
   - 4순위(references) → 파일명만 남기고 본문 제거.
   - 3순위(codemap) → 핵심 파일 5개만.
@@ -293,33 +301,14 @@ git ls-files --others --exclude-standard -z | while IFS= read -r -d '' f; do
   git diff --no-index --binary /dev/null "$f" 2>/dev/null
 done >> "${DIFF_FILE}"
 ```
-> `git diff <merge-base-commit>`는 working tree와 merge-base의 차이를 한 번에 보여주므로 staged + unstaged + 커밋된 변경은 모두 포함되지만, **`git add` 전 untracked 파일은 누락**된다. `/ttutak:dev` 직후 `git add` 전에 cross-review를 호출하는 흐름을 지원하기 위해 `git ls-files --others --exclude-standard`로 untracked 목록을 별도 수집하여 `git diff --no-index`로 신규 파일 diff를 합산한다.
+> `git diff <merge-base-commit>`는 working tree와 merge-base의 차이를 한 번에 보여주므로 staged + unstaged + 커밋된 변경은 모두 포함되지만, **`git add` 전 untracked 파일은 누락**된다. `/dev` 직후 `git add` 전에 cross-review를 호출하는 흐름을 지원하기 위해 `git ls-files --others --exclude-standard`로 untracked 목록을 별도 수집하여 `git diff --no-index`로 신규 파일 diff를 합산한다.
 
-`wc -l < "${DIFF_FILE}"`로 줄 수 확인. **500줄 이상**이거나 `${SCOPE}` == `stat`인 경우 advisor에 따라 처리가 다르다:
-
-- **claude advisor**: Read 도구로 직접 파일을 읽을 수 있으므로 stat 요약 + 안내문으로 충분하다. 단, 위 단계에서 합산한 untracked 파일 diff가 stat overwrite로 사라지지 않도록 stat 요약을 **prepend**하고 untracked 파일 목록은 별도로 보존한다.
-  ```bash
-  STAT_TMP="${DEV_DIR}/diff.stat.tmp"
-  git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat > "${STAT_TMP}"
-  echo "---" >> "${STAT_TMP}"
-  echo "위는 tracked 변경 요약입니다. 변경된 파일을 Read 도구로 직접 확인하라." >> "${STAT_TMP}"
-  echo "" >> "${STAT_TMP}"
-  echo "### Untracked 파일 (별도 추가됨)" >> "${STAT_TMP}"
-  git ls-files --others --exclude-standard >> "${STAT_TMP}"
-  mv "${STAT_TMP}" "${DIFF_FILE}"
-  ```
-- **codex advisor**: codex companion은 외부 CLI라 본 세션의 Read 도구를 호출할 수 없다. stat 요약만으로는 실제 코드 변경을 못 보고 정확도가 크게 떨어진다. 따라서 codex 경로에서는 다음 우선순위로 처리한다:
-  1. 가능하면 전체 diff를 그대로 전달한다 (`${SCOPE}`가 명시적으로 `stat`이 아니면 500줄 초과여도 전체 유지).
-  2. `${SCOPE}` == `stat`이 명시되었거나 diff가 컨텍스트 한계(예: 50,000줄)를 명백히 초과하면 **핵심 파일 위주 부분 diff**를 만든다. `--stat`은 사람이 읽기 좋은 형태(파일명·`|`·변경 표시)라 파싱이 까다로우므로 `--numstat`(추가/삭제 라인 수 + 파일명)으로 정렬한다:
-     ```bash
-     # 변경량(추가+삭제) 상위 N개 파일을 추출하여 부분 diff로 묶는다
-     git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --numstat \
-       | awk '{print $1+$2, $3}' | sort -rn | head -20 \
-       | awk '{print $2}' > "${DEV_DIR}/diff-files.txt"
-     git diff "$(git merge-base HEAD "${BASE_BRANCH}")" -- $(cat "${DEV_DIR}/diff-files.txt") > "${DIFF_FILE}"
-     git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat >> "${DIFF_FILE}"
-     ```
-  3. 이래도 초과하면 사용자에게 알리고 중단한다 — codex로는 stat-only 검증을 하지 않는다.
+`wc -l < "${DIFF_FILE}"`로 줄 수 확인. **500줄 이상**이거나 `${SCOPE}` == `stat`인 경우:
+```bash
+git diff "$(git merge-base HEAD "${BASE_BRANCH}")" --stat > "${DIFF_FILE}"
+echo "---" >> "${DIFF_FILE}"
+echo "위는 요약입니다. 변경된 파일을 Read 도구로 직접 확인하라." >> "${DIFF_FILE}"
+```
 
 ### 2-3. 컨텍스트 통합
 
@@ -338,11 +327,11 @@ codex는 prompt 파일에 저장한 후 인자로 전달, claude는 Task prompt�
 
 `${PROMPT_FILE}` (= `${DEV_DIR}/cross-review-prompt.md`)에 다음 형식으로 작성한다.
 
-> **prompt 본문 작성 규칙**: companion이 `--prompt-file`로 파일을 직접 읽으므로 셸 인용/길이 제한은 무관하다. 다만 codex 측 prompt 파서 안정성을 위해 본문에 백틱(`` ` ``), 이스케이프되지 않은 큰따옴표(`"`), `$` 시작 토큰은 절제하고 코드 인용은 4칸 들여쓰기로 대체할 것을 권장한다.
+> **prompt 본문 작성 규칙**: helper가 파일을 UTF-8로 읽어 stdin으로 전달한다. `$`·백틱·따옴표를 임의로 삭제하지 않고 산출물 원문을 보존한다.
 
 ```xml
 <task>
-ttutak 파이프라인 산출물(PRD/설계/Trust Ledger)과 변경 코드를 교차 검증한다.
+ttuk-ttak 파이프라인 산출물(PRD/설계/Trust Ledger)과 변경 코드를 교차 검증한다.
 변경된 코드가 산출물의 약속을 충족하는지, 산출물에 정의되지 않은 신규 위험이 있는지 보고한다.
 
 diff 파일: ${DIFF_FILE}
@@ -358,7 +347,7 @@ diff 파일: ${DIFF_FILE}
 </grounding_rules>
 
 <structured_output_contract>
-다음 5개 섹션을 정확히 이 순서로 출력한다 (`references 위반`은 references/가 없거나 위반 항목이 없으면 본문에 "위반 없음"으로 적되 **섹션 헤더는 항상 유지**한다 — 정규화 파서가 섹션 존재를 가정한다):
+다음 4개 섹션을 정확히 이 순서로 출력한다:
 
 ## AC 충족 매트릭스
 | AC | 충족 | 근거 (파일:라인 또는 PRD 인용) |
@@ -377,8 +366,9 @@ trust-ledger.md에 없는 신규 risk/policy/gap/assumption만.
   - 근거: ...
   - 권고: ...
 
-## references 위반
-references/ 디렉토리의 파일별로 위반 여부. references/가 없거나 위반이 없으면 "위반 없음"으로 적는다 (섹션 헤더는 항상 유지).
+## references 위반 (해당 시)
+references/ 디렉토리의 파일별로 위반 여부.
+없으면 섹션 자체 생략.
 
 ## 총평
 - 강점 1-2개
@@ -415,25 +405,26 @@ references/ 디렉토리의 파일별로 위반 여부. references/가 없거나
 
 #### 3a-2. codex 호출
 
+재실행 전 기존 `${RAW_FILE}`, `${DEV_DIR}/cross-review.events.jsonl`, `${DEV_DIR}/cross-review.events.jsonl.stderr` **세 파일 모두** 존재하는 것만 충돌 없는 timestamp archive로 옮긴다. 하나라도 그대로 남으면 helper가 기존 출력 충돌로 거절할 수 있다. 백업 이름이 이미 있으면 새 suffix를 사용하고 기존 archive를 덮어쓰지 않는다. 이전 성공 응답을 재사용하지 않는다. 아래는 Bash 실행 예시이며 Python 실행 파일은 setup에서 검증한 실제 경로로 치환한다.
+
 ```bash
-node "${CODEX_COMPANION}" task --prompt-file "${PROMPT_FILE}" \
-  > "${RAW_FILE}" 2> "${DEV_DIR}/cross-review.err"
+python3 "$GX_PLUGIN_ROOT/scripts/codex-run.py" --cwd "$PROJECT_ROOT" \
+  --prompt "$PROMPT_FILE" --final "$RAW_FILE" \
+  --events "$DEV_DIR/cross-review.events.jsonl" --mode review --timeout 300
 ```
 
-- companion이 정식 지원하는 `--prompt-file` 플래그로 파일 경로만 전달한다. 위치 인자에 본문을 펼치지 않으므로 OS 명령줄 길이 제한(`ARG_MAX`, Windows ~32KB)을 회피한다.
-- Bash 도구 호출 시 `timeout: 300000` 파라미터를 명시한다 (기본 2분으로는 부족).
-- `--write` 플래그는 명시적으로 사용하지 않는다 (read-only 검증).
+helper가 prompt를 stdin으로 전달하고 read-only 세션을 연다. 프로세스 종료 코드가 0이 아니면 `${RAW_FILE}` 내용이 있어도 실패다. stderr와 이벤트를 보고하고 중단하며 정규화·자동 수정을 진행하지 않는다.
 
 #### 3a-3. 응답 검증
 
-1. 종료 코드 0 확인. 실패 시 `${DEV_DIR}/cross-review.err` 마지막 20줄을 사용자에게 표시하고 중단.
+1. 종료 코드 0 확인. 실패 시 stderr 마지막 20줄을 사용자에게 표시하고 중단.
 2. `${RAW_FILE}` 줄 수 확인. 0줄이면 호출 실패로 간주.
 3. 영어 응답 감지: 첫 50줄에서 한국어 문자(가-힣) 비율이 20% 미만이면 영어로 간주. 이 경우 한국어 정규화 단계를 추가:
    - 오케스트레이터가 직접 응답을 한국어로 재작성한다 (의미는 보존).
 
-### 3-B. claude 경로
+### 3-B. native/claude 역할 경로
 
-`${ADVISOR}` == `claude`인 경우.
+`${ADVISOR}` == `native`이거나 Claude Code 호스트에서 `${ADVISOR}` == `claude`인 경우. Codex native는 공통 실행 규약의 역할 본문·도구 제약과 현재 태스크 prompt 전문을 자식에게 전달한다. Claude Code의 기존 Task 타입은 유지한다.
 
 #### 3b-1. cross-review contract
 
@@ -441,7 +432,7 @@ node "${CODEX_COMPANION}" task --prompt-file "${PROMPT_FILE}" \
 
 **Task A: qa-manager (cross-review 미션)**
 
-`Task(subagent_type="ttutak:qa-manager")` — prompt에 다음을 포함:
+`Task(subagent_type="ttuk-ttak:qa-manager")` — prompt에 다음을 포함:
 
 ```
 [중요] 이 호출은 일반 phase-review가 아닌 cross-review이다.
@@ -470,7 +461,7 @@ node "${CODEX_COMPANION}" task --prompt-file "${PROMPT_FILE}" \
 
 **Task B: security-auditor (cross-review 미션)**
 
-`Task(subagent_type="ttutak:security-auditor")` — prompt에 다음을 포함:
+`Task(subagent_type="ttuk-ttak:security-auditor")` — prompt에 다음을 포함:
 
 ```
 [중요] 이 호출은 일반 review가 아닌 cross-review이다.
@@ -511,7 +502,9 @@ advisor와 무관하게 동일한 포맷으로 정규화하여 `${RESULT_FILE}`�
 ```markdown
 # Cross-Review 결과
 
-- advisor: codex | claude
+- advisor: codex | native | claude
+- 실행 하네스: Codex CLI | 현재 하네스 | Claude Code
+- 실제 모델: 확인된 모델명 또는 미확인 (이벤트/도구 기록에 있을 때만 기재)
 - 브랜치: ${BRANCH} (base: ${BASE_BRANCH})
 - DEV_DIR: ${DEV_DIR}
 - 실행 시각: 2026-05-04T10:30:00Z
@@ -548,9 +541,9 @@ advisor와 무관하게 동일한 포맷으로 정규화하여 `${RESULT_FILE}`�
 ### Info
 - ...
 
-## references 위반
+## references 위반 (해당 시)
 
-(references/가 없거나 위반이 없으면 "위반 없음"으로 표기. 섹션 헤더는 항상 유지)
+(섹션 자체를 생략 가능)
 
 ## 총평
 - 강점: ...
@@ -560,7 +553,10 @@ advisor와 무관하게 동일한 포맷으로 정규화하여 `${RESULT_FILE}`�
 
 ### 4-2. 파일 저장
 
-`Write` 도구로 정규화된 결과를 `${RESULT_FILE}`에 저장한다. 이 호출은 Bash 명령이 아니라 **Claude Code의 Write 도구 호출**이다 (셸로 실행되지 않는다).
+```bash
+# RESULT_FILE에 정규화된 결과 작성
+Write(${RESULT_FILE}, normalized_content)
+```
 
 `${RAW_FILE}`(advisor의 원시 응답)도 보존한다 — 사용자가 원본을 확인할 수 있도록.
 
@@ -572,6 +568,7 @@ advisor와 무관하게 동일한 포맷으로 정규화하여 `${RESULT_FILE}`�
 ## Cross-Review 완료
 
 - advisor: codex
+- 실행 하네스/실제 모델: Codex CLI / 확인된 모델명 또는 미확인
 - AC 충족: [Must] 4/5, [Should] 2/3
 - 설계 범위 이탈: 1건
 - 신규 위험: Critical 1, Warning 2, Info 3
@@ -601,13 +598,17 @@ advisor와 무관하게 동일한 포맷으로 정규화하여 `${RESULT_FILE}`�
 
 ```
 AskUserQuestion(
-  question: "발견된 N개 항목을 어떻게 처리할까요?",
-  options: [
-    { value: "fix_all", label: "전부 수정", description: "모든 항목을 coder에 위임하여 수정" },
-    { value: "fix_partial", label: "일부 수정", description: "항목별로 개별 선택" },
-    { value: "fix_custom", label: "직접 입력", description: "Other로 이동해서 수정할 항목 번호를 자연어로 입력 (예: 1, 3, 5번)" },
-    { value: "skip_all", label: "전부 건너뛰기", description: "기록만 남기고 종료" }
-  ]
+  questions: [{
+    question: "발견된 N개 항목을 어떻게 처리할까요?",
+    header: "처리 방식",
+    options: [
+      { label: "전부 수정", description: "모든 항목을 coder에 위임하여 수정" },
+      { label: "일부 수정", description: "항목별로 개별 선택" },
+      { label: "직접 입력", description: "Other로 이동해서 수정할 항목 번호를 자연어로 입력 (예: 1, 3, 5번)" },
+      { label: "전부 건너뛰기", description: "기록만 남기고 종료" }
+    ],
+    multiSelect: false
+  }]
 )
 ```
 
@@ -615,7 +616,7 @@ AskUserQuestion(
 
 #### 전부 수정
 
-모든 항목을 한 번에 `Task(subagent_type="ttutak:coder")` 수정 모드로 위임:
+모든 항목을 한 번에 `Task(subagent_type="ttuk-ttak:coder")` 수정 모드로 위임:
 
 prompt:
 - 수정 항목 목록 전체 (각 항목의 위치, 문제, 권고)
@@ -641,17 +642,21 @@ prompt:
 질문 결과 "이후 전부 수정"이면 `${BATCH_MODE}` = `AUTO_FIX`, "이후 전부 건너뛰기"면 `${BATCH_MODE}` = `AUTO_SKIP`로 전환하고 다음 항목부터 적용한다.
 ```
 AskUserQuestion(
-  question: "1번 항목: [Critical] PaymentService:55 — 한도 초과 검증 누락. 수정할까요?",
-  options: [
-    { value: "fix", label: "수정", description: "이 항목을 coder에 위임" },
-    { value: "skip", label: "건너뛰기", description: "이 항목 건너뛰고 다음으로" },
-    { value: "fix_rest", label: "이후 전부 수정", description: "이 항목부터 끝까지 모두 수정" },
-    { value: "skip_rest", label: "이후 전부 건너뛰기", description: "이 항목부터 끝까지 모두 건너뛰기" }
-  ]
+  questions: [{
+    question: "1번 항목: [Critical] PaymentService:55 — 한도 초과 검증 누락. 수정할까요?",
+    header: "1/N",
+    options: [
+      { label: "수정", description: "이 항목을 coder에 위임" },
+      { label: "건너뛰기", description: "이 항목 건너뛰고 다음으로" },
+      { label: "이후 전부 수정", description: "이 항목부터 끝까지 모두 수정" },
+      { label: "이후 전부 건너뛰기", description: "이 항목부터 끝까지 모두 건너뛰기" }
+    ],
+    multiSelect: false
+  }]
 )
 ```
 
-승인된 항목만 모아서 `Task(subagent_type="ttutak:coder")` 수정 모드로 일괄 위임.
+승인된 항목만 모아서 `Task(subagent_type="ttuk-ttak:coder")` 수정 모드로 일괄 위임.
 
 #### 직접 입력
 
@@ -663,11 +668,15 @@ AskUserQuestion(
 오케스트레이터가 입력을 파싱하여 매칭되는 항목들을 식별한다. 모호하면 재확인:
 ```
 AskUserQuestion(
-  question: "다음 항목으로 이해했습니다: 1번, 3번, 5번. 맞나요?",
-  options: [
-    { value: "ok", label: "맞음", description: "이 항목들로 진행" },
-    { value: "redo", label: "다시 입력", description: "Other로 다시 입력" }
-  ]
+  questions: [{
+    question: "다음 항목으로 이해했습니다: 1번, 3번, 5번. 맞나요?",
+    header: "확인",
+    options: [
+      { label: "맞음", description: "이 항목들로 진행" },
+      { label: "다시 입력", description: "Other로 다시 입력" }
+    ],
+    multiSelect: false
+  }]
 )
 ```
 
@@ -684,11 +693,15 @@ AskUserQuestion(
 수정이 발생했으면 사용자에게 묻는다:
 ```
 AskUserQuestion(
-  question: "수정이 완료되었습니다. cross-review를 다시 실행할까요?",
-  options: [
-    { value: "rerun", label: "재실행", description: "수정된 코드로 cross-review 재수행" },
-    { value: "exit", label: "종료", description: "현재 상태로 종료" }
-  ]
+  questions: [{
+    question: "수정이 완료되었습니다. cross-review를 다시 실행할까요?",
+    header: "재실행",
+    options: [
+      { label: "재실행", description: "수정된 코드로 cross-review 재수행" },
+      { label: "종료", description: "현재 상태로 종료" }
+    ],
+    multiSelect: false
+  }]
 )
 ```
 
@@ -698,40 +711,45 @@ AskUserQuestion(
 
 ## 산출물 부재 fallback
 
-Step 0-3에서 prd.md/design.md 둘 다 없으면 이 경로를 따른다.
+Step 0-3에서 prd.md·ac.md·design.md 셋 다 없으면 이 경로를 따른다.
 
 ### F-1. fallback 모드 안내
 
 ```
-산출물(prd.md, design.md)이 없습니다.
+산출물(prd.md·ac.md·design.md)이 없습니다.
 cross-review의 차별점인 "약속 대비 충실도 검증"을 수행할 수 없습니다.
-일반 모드로 진행하면 codex 일반 리뷰 또는 qa-manager 일반 리뷰와 거의 동일합니다.
-산출물을 먼저 만들고 싶다면 `/ttutak:dev`를 호출해 PRD/설계서를 생성하세요.
+일반 모드로 진행하면 기본 /codex:review 또는 qa-manager 일반 리뷰와 거의 동일합니다.
 ```
 
 ### F-2. 진행 여부 확인
 
 ```
 AskUserQuestion(
-  question: "일반 모드로 진행할까요?",
-  options: [
-    { value: "proceed", label: "진행", description: "산출물 없이 diff만으로 일반 리뷰 수행" },
-    { value: "abort", label: "중단", description: "/ttutak:dev로 산출물을 먼저 생성하세요" }
-  ]
+  questions: [{
+    question: "일반 모드로 진행할까요?",
+    header: "fallback",
+    options: [
+      { label: "진행", description: "산출물 없이 diff만으로 일반 리뷰 수행" },
+      { label: "중단", description: "/dev로 산출물을 먼저 생성하세요" }
+    ],
+    multiSelect: false
+  }]
 )
 ```
 
 ### F-3. fallback 실행
 
-**codex 선택 시**: companion의 `review` 서브명령을 그대로 호출 (산출물 주입 없음). companion이 자체적으로 diff를 수집하므로 `${DIFF_FILE}`은 전달하지 않는다.
-```bash
-node "${CODEX_COMPANION}" review --wait --base "${BASE_BRANCH}" --scope auto > "${RAW_FILE}"
-```
-- `--wait`: 동기 결과 수신.
-- `--base`: 베이스 브랜치 명시 (Step 0-2 결과).
-- `--scope`: companion은 `auto|working-tree|branch`만 허용하므로 항상 `auto`로 고정한다. Step 0-0의 `${SCOPE}`(`diff|stat`)는 자체 diff 수집(Step 2-2)에만 의미 있고, fallback은 companion이 알아서 결정한다.
+**fallback 승인 후 공통 선행 단계**: Step 1의 advisor 선택과 1-1 환경 확인을 수행한다. `--advisor claude`를 Codex 호스트에서 선택했다면 여기서 중단한다. 이어서 Step 2-2의 diff 수집을 **실제로 실행**하여 `${DIFF_FILE}`을 만든다. 산출물이 없는 경우에도 diff 수집을 건너뛰지 않는다. diff가 비었으면 "변경사항이 없습니다"를 보고 종료한다. 이 선행 단계가 끝난 뒤 F-3으로 돌아온다.
 
-**claude 선택 시**: `qa-manager`만 호출, 일반 contract 사용 (cross-review 미션 제거). security-auditor는 호출하지 않는다 (산출물 없으면 보안 정합성 검증이 불가능).
+**codex 선택 시**: 일반 리뷰 미션과 `${BASE_BRANCH}`·실제로 수집한 `${DIFF_FILE}` 경로를 `${PROMPT_FILE}`에 기록하고 네이티브 helper의 read-only review 모드로 호출한다. 산출물 없는 경우 AC 매트릭스가 없음을 prompt에 명시한다. 기존 `${RAW_FILE}`, `${DEV_DIR}/cross-review.events.jsonl`, `${DEV_DIR}/cross-review.events.jsonl.stderr` 세 파일 모두 3a-2와 같은 충돌 없는 timestamp archive로 옮긴다.
+```bash
+python3 "$GX_PLUGIN_ROOT/scripts/codex-run.py" --cwd "$PROJECT_ROOT" \
+  --prompt "$PROMPT_FILE" --final "$RAW_FILE" \
+  --events "$DEV_DIR/cross-review.events.jsonl" --mode review --timeout 300
+```
+- 종료 코드가 0이 아니면 결과 정규화 없이 중단한다. diff 수집 범위는 Step 2-2에서 만든 `${DIFF_FILE}`을 따른다.
+
+**native/claude 역할 선택 시**: `qa-manager`만 호출, 일반 contract 사용 (cross-review 미션 제거). security-auditor는 호출하지 않는다 (산출물 없으면 보안 정합성 검증이 불가능). Codex의 claude 선택은 Step 1에서 이미 중단한다.
 
 결과는 동일하게 `${RESULT_FILE}`에 저장. AC 매트릭스 / 설계 범위 이탈 섹션은 생략하고 신규 위험 섹션만 채운다.
 
@@ -750,7 +768,7 @@ node "${CODEX_COMPANION}" review --wait --base "${BASE_BRANCH}" --scope auto > "
 1. advisor 응답에 Critical 항목이 있어도 즉시 coder를 호출하지 않는다.
 2. 모든 수정은 Step 5의 AskUserQuestion을 거쳐 사용자가 명시적으로 승인한 항목만 수행.
 3. coder는 "수정" 모드로만 호출하고, 신규 기능 추가나 리팩토링은 위임 범위 밖.
-4. 이 원칙은 codex 플러그인의 `codex-result-handling` 스킬과 일치한다.
+4. 승인된 범위만 수정하고 리뷰 결과를 자동으로 구현 작업으로 전환하지 않는다.
 
 ---
 
@@ -760,7 +778,7 @@ node "${CODEX_COMPANION}" review --wait --base "${BASE_BRANCH}" --scope auto > "
 - **claude Task 실패**: 어느 한 Task가 실패하면 성공한 결과만으로 정규화. 사용자에게 부분 결과임을 명시.
 - **컨텍스트 초과**: Step 2-1의 슬라이싱으로 60,000 토큰 이하로 압축. 그래도 초과하면 사용자에게 `--scope stat` 사용 안내.
 - **diff 빈 파일**: 변경사항이 없으면 "변경사항이 없습니다." 표시 후 즉시 종료.
-- **pre-tool-guard 충돌**: ttutak의 `pre-tool-guard.sh` 훅은 보호 브랜치 직접 커밋만 차단하므로 codex companion(`node ...`) 호출은 통과한다. 만약 사용자가 훅을 커스터마이징하여 차단된 경우, 임시 우회를 안내한다.
+- **hook 차단**: Ttuk Ttak 훅이 실행을 차단하면 차단 이유를 보고하고 중단한다. 훅 신뢰·검증 우회로 재시도하지 않는다.
 
 ---
 
@@ -770,7 +788,9 @@ node "${CODEX_COMPANION}" review --wait --base "${BASE_BRANCH}" --scope auto > "
 
 ```yaml
 status: in_progress | completed | aborted
-advisor: codex | claude
+advisor: codex | native | claude
+execution_harness: Codex CLI | current | Claude Code
+actual_model: 확인된 모델명 또는 미확인
 started: 2026-05-04T10:30:00Z
 completed: 2026-05-04T10:35:00Z
 findings:
@@ -792,6 +812,8 @@ processed:
 
 ## 다른 스킬과의 관계
 
-- `/ttutak:dev`: cross-review의 산출물(prd/design/trust-ledger/self-check)을 생성한다. **선행 의존**. dev의 phase-review와 cross-review는 미션이 다르다 — phase-review는 구현 직후 일반 QA, cross-review는 PR 직전 산출물 정합성 검증이다.
-- `/ttutak:commit`, `/ttutak:pull-request`: cross-review에서 발견·수정한 변경사항을 커밋/PR로 마무리한다.
-- `/codex:review`, `/codex:adversarial-review` (codex 플러그인 별도 설치 시): 일반 코드 리뷰가 추가로 필요할 때 cross-review와 독립적으로 사용한다.
+- `/dev`: cross-review의 산출물(prd/design/trust-ledger)을 생성한다. 선행 의존.
+- `/tdd`: 산출물 파일 구조(prd/design/trust-ledger)가 동일하므로 tdd 완료물에도 그대로 동작한다. 이때 claude advisor가 호출하는 qa-manager는 "tdd 파이프라인 내부 호출 금지" 대상이 아니다 — cross-review는 파이프라인 완료 후의 독립 스킬이므로 허용된다 (tdd 내부 리뷰는 reviewer(spec+quality 통합 1석)가 담당하며, cross-review는 그와 별개의 사후 검증 층이다).
+- `/codex:review`: 일반 코드 리뷰. cross-review와 별개로 사용 가능.
+- `/codex:adversarial-review`: cross-review의 codex 경로보다 더 공격적인 비판이 필요하면 별도 호출.
+- `/commit`, `/pull-request`: cross-review 후 처리한 변경사항을 커밋/PR.
